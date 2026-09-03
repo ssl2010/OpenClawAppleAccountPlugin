@@ -1,12 +1,12 @@
 ---
 name: apple-account
-description: Safely read and manage the operator's Apple calendar, reminders, and supported Apple account data through the apple-account plugin.
+description: Safely read and manage the operator's Apple Calendar through the pyiCloud-backed apple-account plugin.
 metadata: {"openclaw":{"requires":{"config":["plugins.entries.apple-account.enabled"]}}}
 ---
 
 # Apple Account
 
-Use the `apple_*` tools only for the operator's own Apple account.
+Use the `apple_*` tools only for the operator's own Apple account. Calendar read, create, update, and delete are implemented; do not claim Reminders or Notes support until their tools exist.
 
 ## Safety rules
 
@@ -19,7 +19,5 @@ Use the `apple_*` tools only for the operator's own Apple account.
 - Do not invoke Find My actions, destructive Drive operations, or account-security actions.
 - If authentication expires, report that reauthentication is required; do not repeatedly retry or trigger multiple 2FA prompts.
 - Never retry an ambiguously timed-out mutation through a fallback provider.
-
-## Status
-
-This repository is currently a scaffold. Only `apple_account_capabilities` is implemented; data-access tools will be added incrementally after contract and security tests pass.
+- Always list calendars before the first write when the destination calendar is not already known.
+- Resolve deletion and update targets with `apple_calendar_list_events` followed by `apple_calendar_get_event`; never guess identifiers from titles alone.

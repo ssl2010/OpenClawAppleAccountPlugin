@@ -2,7 +2,8 @@
 
 A security-focused OpenClaw tool plugin for accessing personal Apple account data through a Linux-hosted OpenClaw Gateway, using pyiCloud first and an optional legacy macOS bridge only if evidence shows it is needed.
 
-> Project status: architecture and build scaffold. No Apple account data is accessed yet.
+> Project status: pyiCloud Calendar MVP deployed on US1. Calendar reads and
+> explicitly allowed mutations are live; the optional legacy Mac provider remains deferred.
 
 ## Goals
 
@@ -34,9 +35,16 @@ docs/                        Product, architecture, decisions, and roadmap
 openclaw.plugin.json         OpenClaw manifest
 ```
 
-## Current scaffold
+## Current implementation
 
-The only registered tool is `apple_account_capabilities`. It reports the planned surface and never reads credentials. Runtime tools will be introduced one capability at a time, starting with account status and calendar reads.
+The plugin registers account status, calendar list/get/query/create/update/delete,
+and deterministic 12306 email-planning tools. A restricted systemd worker checks
+trusted 12306 Gmail notices every ten minutes and applies idempotent Calendar
+changes. The accompanying skills describe interactive safety and rail-email
+semantics. Reminders and Notes remain future capabilities and are not advertised.
+
+See [12306 automation](docs/RAIL12306_AUTOMATION.md) for trust, merge,
+normalization, and known timetable limits.
 
 ## Development prerequisites
 
@@ -44,7 +52,7 @@ The only registered tool is `apple_account_capabilities`. It reports the planned
 - OpenClaw 2026.8.2 or newer
 - Python 3.11 or newer
 
-Build commands are documented now and will become executable after dependencies are installed:
+Development and verification commands:
 
 ```bash
 npm install
@@ -52,6 +60,14 @@ npm run check
 python3 -m venv .venv
 .venv/bin/pip install -e './python[dev]'
 .venv/bin/pytest python/tests
+```
+
+Install the plugin and its model-facing skills with:
+
+```bash
+openclaw plugins install --link ./dist/index.js --force --accept-capabilities
+openclaw skills install --global --force ./skills/apple-account
+openclaw skills install --global --force ./skills/rail12306-calendar
 ```
 
 ## Credential policy

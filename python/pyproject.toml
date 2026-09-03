@@ -20,6 +20,7 @@ dev = [
 
 [project.scripts]
 openclaw-apple-bridge = "openclaw_apple_bridge.cli:main"
+openclaw-rail12306-worker = "openclaw_apple_bridge.rail12306_worker:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -29,3 +30,6 @@ pythonpath = ["src"]
 
 [tool.ruff]
 line-length = 100
+
+[tool.mypy]
+ignore_missing_imports = true

@@ -1,0 +1,21 @@
+[Unit]
+Description=Process trusted 12306 Gmail notices into Apple Calendar
+After=network-online.target openclaw-gateway.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/work/OpenClawAppleAccountPlugin
+EnvironmentFile=%h/.config/openclaw/gog.env
+EnvironmentFile=%h/.config/openclaw-apple-account/icloud.env
+EnvironmentFile=%h/.config/openclaw-apple-account/rail12306.env
+ExecStart=%h/work/OpenClawAppleAccountPlugin/.venv/bin/openclaw-rail12306-worker --apply --max-messages 20
+TimeoutStartSec=180
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.local/state/openclaw-apple-account
+
+[Install]
+WantedBy=default.target

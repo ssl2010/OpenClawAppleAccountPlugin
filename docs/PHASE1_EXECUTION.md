@@ -1,23 +1,26 @@
 # Phase 1 execution plan
 
-Phase 1 delivers account/provider status plus read-only Calendar through pyiCloud alone. It performs no Apple mutations and intentionally does not implement or enable the Mac provider.
+Phase 1 originally targeted read-only Calendar. The operator subsequently
+approved Calendar mutations and pre-approved automation, so the deployed MVP
+also includes create, update, and delete plus the fixed-scope 12306 worker. It
+still intentionally does not implement or enable the Mac provider.
 
 ## Workstream A — shared contracts
 
-- [ ] Add TypeScript provider, envelope, error, calendar, and health types.
-- [ ] Add equivalent Python bridge models.
+- [x] Add TypeScript provider, envelope, error, calendar, and health types.
+- [x] Add equivalent Python bridge models.
 - [ ] Add JSON fixtures that contain only synthetic data.
 - [ ] Add cross-language contract tests.
-- [ ] Add canonical timestamp, timezone, and stable-ID normalization.
+- [x] Add canonical timestamp, timezone, and stable-ID normalization.
 
 ## Workstream B — pyiCloud provider on US1
 
 - [ ] Refactor the proven InkBoard authentication state machine.
 - [ ] Store password input and reusable sessions outside repository/model context.
-- [ ] Implement bounded `account.status` without triggering new 2FA prompts.
-- [ ] Implement Calendar list, event list, and event get.
-- [ ] Add typed errors for 2FA, locked account, expired session, schema drift, timeout, and rate limit.
-- [ ] Add sanitized fixtures and unit tests.
+- [x] Implement bounded `account.status` without triggering new 2FA prompts.
+- [x] Implement Calendar list, event list, and event get.
+- [x] Add typed errors for authentication, timeout, rate limit, and upstream changes.
+- [x] Add synthetic fixtures and unit tests.
 
 ## Workstream C — pyiCloud observability and resilience
 
@@ -29,20 +32,20 @@ Phase 1 delivers account/provider status plus read-only Calendar through pyiClou
 
 ## Workstream D — OpenClaw integration
 
-- [ ] Replace scaffold capability tool with `apple_account_status`.
-- [ ] Add Calendar read tools and strict TypeBox schemas.
+- [x] Replace scaffold capability tool with `apple_account_status`.
+- [x] Add Calendar read and mutation tools with strict schemas.
 - [ ] Implement pyiCloud health/cache state with no fallback provider.
 - [ ] Annotate results with provider and freshness.
-- [ ] Preserve typed pyiCloud failures instead of hiding them with fallback.
-- [ ] Add plugin tool allowlist documentation.
+- [x] Preserve typed pyiCloud failures instead of hiding them with fallback.
+- [x] Add plugin tool allowlist documentation.
 
 ## Workstream E — validation and deployment
 
-- [ ] TypeScript unit and plugin contract tests.
-- [ ] Python unit and fixture tests.
+- [x] TypeScript unit and plugin contract tests.
+- [x] Python unit and fixture tests.
 - [ ] pyiCloud valid, expired, 2FA-required, and upstream-schema-change tests.
 - [ ] pyiCloud timeout, rate-limit, pagination, network-loss, process-restart, and US1-reboot tests.
-- [ ] Install packed plugin on US1 and inspect runtime.
+- [x] Install the plugin on US1 and inspect runtime.
 - [ ] Query upcoming events through Feishu using pyiCloud and verify provider/error annotations.
 - [ ] Run OpenClaw security audit and confirm no new critical findings.
 
@@ -51,7 +54,8 @@ Phase 1 delivers account/provider status plus read-only Calendar through pyiClou
 - `apple_account_status` reports pyiCloud authentication and service health accurately.
 - Calendar list/get returns normalized, bounded results through pyiCloud.
 - No Mac runtime or hidden fallback is enabled.
-- No mutation tool is registered.
+- Mutation tools are registered only because the operator explicitly approved
+  interactive writes and pre-approved fixed-scope automation.
 - No secret appears in source, logs, tool results, status UI, or fixtures.
 - US1 Gateway and Feishu remain healthy through plugin restart.
 

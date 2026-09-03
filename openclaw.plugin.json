@@ -1,7 +1,7 @@
 {
   "id": "apple-account",
   "name": "Apple Account",
-  "description": "Security-focused tools for personal Apple account data.",
+  "description": "Security-focused pyiCloud tools for personal Apple Calendar data.",
   "version": "0.1.0",
   "activation": {
     "onStartup": true
@@ -15,6 +15,12 @@
       "sessionDirectory": {
         "type": "string"
       },
+      "passwordFile": {
+        "type": "string"
+      },
+      "appleIdEnv": {
+        "type": "string"
+      },
       "region": {
         "anyOf": [
           {
@@ -26,13 +32,41 @@
             "const": "china"
           }
         ]
+      },
+      "requestTimeoutSeconds": {
+        "type": "number",
+        "minimum": 5,
+        "maximum": 60
+      },
+      "bridgeTimeoutSeconds": {
+        "type": "number",
+        "minimum": 5,
+        "maximum": 120
       }
     },
     "additionalProperties": false
   },
   "contracts": {
     "tools": [
-      "apple_account_capabilities"
+      "apple_account_status",
+      "apple_calendar_list_calendars",
+      "apple_calendar_list_events",
+      "apple_calendar_get_event",
+      "apple_calendar_create_event",
+      "apple_calendar_update_event",
+      "apple_calendar_delete_event",
+      "apple_rail12306_plan_email"
     ]
+  },
+  "toolMetadata": {
+    "apple_calendar_create_event": {
+      "optional": true
+    },
+    "apple_calendar_update_event": {
+      "optional": true
+    },
+    "apple_calendar_delete_event": {
+      "optional": true
+    }
   }
 }
