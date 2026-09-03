@@ -1,2 +1,0 @@
-[console_scripts]
-openclaw-apple-bridge = openclaw_apple_bridge.cli:main
