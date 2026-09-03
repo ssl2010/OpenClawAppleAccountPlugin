@@ -32,7 +32,7 @@ The project is licensed under Apache-2.0.
 
 ## ADR-006: Mac-primary, pyiCloud-fallback routing
 
-**Status:** accepted.
+**Status:** superseded by ADR-015.
 
 A custom daemon on an older always-on Mac is the preferred provider when healthy. US1 pyiCloud adapters provide capability-specific fallback. The Mac does not need to run OpenClaw. Reads may fail over automatically; ambiguous writes may not.
 
@@ -83,6 +83,14 @@ The Mac exposes a loopback HTTP/JSON service and creates a restricted reverse SS
 **Status:** accepted as the secure default.
 
 Do not enable automatic macOS login. EventKit and Notes access become available after the operator logs into the GUI user following a reboot. Until then, US1 reports the Mac offline and uses pyiCloud for supported reads. This avoids storing a macOS login password for automatic login.
+
+## ADR-015: pyiCloud-first development and evidence-gated Mac provider
+
+**Status:** accepted for Phase 1.
+
+Develop, deploy, and stabilize the pyiCloud provider on US1 before implementing the legacy Mac bridge. During the stabilization window, production routing has no Mac fallback so authentication expiry, schema drift, throttling, latency, and data-normalization defects remain visible. Begin Mac implementation only if the stabilization report identifies a required capability or reliability target that pyiCloud cannot meet. If pyiCloud meets the v1 service objectives, the Mac remains retired to avoid unnecessary energy use and operational complexity.
+
+Previously completed Mac inventory, EventKit smoke testing, key provisioning, and transport design are retained as contingency evidence, not as Phase 1 implementation commitments.
 
 ## Open decisions
 

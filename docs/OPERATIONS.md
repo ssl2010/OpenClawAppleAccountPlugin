@@ -2,8 +2,8 @@
 
 ## Host roles
 
-- US1 owns OpenClaw, plugin policy, approvals, provider routing, pyiCloud fallback, audit metadata, and operator notifications.
-- ShileideAir owns native Apple access, TCC permissions, Mac-local request receipts, and the outbound restricted tunnel.
+- US1 owns OpenClaw, plugin policy, approvals, the primary pyiCloud provider, audit metadata, and operator notifications.
+- ShileideAir is a dormant contingency host. It owns native Apple access and tunnel state only if Conditional Phase M is approved.
 - The local development Mac owns source editing, signing/release preparation, and administrative SSH access.
 
 ## Access paths
@@ -23,7 +23,7 @@
 ~/.local/state/openclaw-apple-account/   provider state, approvals, audit metadata
 ```
 
-### Legacy Mac
+### Legacy Mac (dormant contingency)
 
 ```text
 ~/work/openclaw-apple-bridge/                         deployment
@@ -36,33 +36,35 @@
 Expose these states separately:
 
 - process: stopped, starting, healthy, degraded;
-- transport: disconnected, connecting, connected;
-- permissions: calendar, reminders, notes individually granted/denied/unknown;
-- providers: Mac and pyiCloud individually healthy/degraded/offline;
-- effective route: provider per capability;
+- authentication: authenticated, reauthentication-required, two-factor-required, locked;
+- pyiCloud services: individually healthy, degraded, unavailable, or schema-incompatible;
+- session: age, last validated timestamp, and redacted schema fingerprint;
+- effective route: pyiCloud during Phase 1/1S;
 - last successful read/write and last safe error code.
+
+Mac transport, permissions, and provider health are added only if Conditional Phase M is approved.
 
 Do not display item bodies, credentials, session paths, tokens, signatures, or full identifiers in the status UI.
 
-## Startup order
+## pyiCloud startup order
 
-1. User logs into the Mac GUI session.
-2. launchd starts the bridge service.
-3. Bridge performs local permission/capability probes.
-4. Tunnel job starts and verifies remote-forward establishment.
-5. US1 health probe sees the Mac and validates HMAC protocol compatibility.
-6. Router marks each advertised Mac capability eligible.
+1. US1 starts OpenClaw Gateway and loads the plugin.
+2. The plugin validates non-secret configuration and protected session-directory permissions.
+3. A bounded status probe classifies authentication without triggering repeated 2FA.
+4. The plugin advertises only pyiCloud capabilities that passed compatibility checks.
+5. Metrics and redacted schema fingerprints begin recording for the stabilization report.
 
-Automatic login stays disabled. Before GUI login, pyiCloud provides only its supported fallback capabilities.
+The retired Mac jobs remain disabled throughout Phase 1 and Phase 1S.
+
+If Conditional Phase M is approved, its separate startup sequence is defined in the Mac bridge runbook before deployment. Automatic macOS login remains disabled.
 
 ## Failure behavior
 
-- Tunnel failure: keep native service local, reconnect with capped backoff, report Mac offline on US1.
-- TCC revoked: mark only the affected capability degraded and notify once.
-- Mac sleep/offline: reads fall back per capability; no queued Mac writes.
-- pyiCloud auth expiry: mark fallback unavailable and request operator reauthentication once.
+- pyiCloud auth expiry: mark the provider unavailable and request operator reauthentication once.
+- network/Apple outage: use bounded safe-read retries and circuit breaking; expose a typed error when exhausted.
+- rate limiting: honor retry guidance with a hard attempt/deadline cap and no retry storm.
 - provider schema drift: fail closed and retain a redacted diagnostic fingerprint.
-- ambiguous mutation: block fallback/retry and require reconciliation.
+- ambiguous mutation: block retry and require reconciliation.
 
 ## Log retention defaults
 
@@ -83,7 +85,7 @@ They must not be reloaded alongside the new bridge. Their source is reference-on
 
 ## Preflight
 
-Run before Phase 1 development or deployment:
+Run before conditional Mac development or deployment, not before pyiCloud Phase 1:
 
 ```bash
 scripts/check-mac-prereqs.sh

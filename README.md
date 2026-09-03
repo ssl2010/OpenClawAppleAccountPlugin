@@ -1,6 +1,6 @@
 # OpenClaw Apple Account Plugin
 
-A security-focused OpenClaw tool plugin for accessing personal Apple account data through a Linux-hosted OpenClaw Gateway and an optional legacy macOS bridge.
+A security-focused OpenClaw tool plugin for accessing personal Apple account data through a Linux-hosted OpenClaw Gateway, using pyiCloud first and an optional legacy macOS bridge only if evidence shows it is needed.
 
 > Project status: architecture and build scaffold. No Apple account data is accessed yet.
 
@@ -14,15 +14,15 @@ A security-focused OpenClaw tool plugin for accessing personal Apple account dat
 
 ## Architecture
 
-The plugin uses three intentionally separate layers:
+The plugin uses two initial layers and one conditional extension:
 
 1. A TypeScript OpenClaw tool plugin owns typed tool contracts, permission boundaries, validation, and model-visible results.
-2. A lightweight bridge on an always-on Mac is the preferred provider when healthy and accesses native Apple applications without requiring OpenClaw on that Mac.
-3. A private Python bridge on US1 owns pyiCloud authentication, session reuse, response normalization, and fallback network calls.
+2. A private Python bridge on US1 is the initial and preferred provider. It owns pyiCloud authentication, session reuse, response normalization, and Apple network calls.
+3. A lightweight bridge on the legacy Mac is a deferred, optional provider for capabilities or reliability gaps that pyiCloud cannot satisfy.
 
-Provider routing is capability-aware. The Mac is preferred while online; pyiCloud is used only for capabilities that have a tested fallback. Mutations never fail over after an ambiguous result.
+Phase 1 deliberately runs without the Mac provider so pyiCloud defects cannot be hidden by fallback. Mac development starts only after the pyiCloud stabilization gate and an explicit evidence-based decision. Mutations never fail over after an ambiguous result.
 
-See [Requirements](docs/REQUIREMENTS.md), [traceability](docs/TRACEABILITY.md), [tool contracts](docs/TOOL_CONTRACTS.md), [Architecture](docs/ARCHITECTURE.md), [Bridge protocol](docs/BRIDGE_PROTOCOL.md), [Approval policies](docs/APPROVAL_POLICIES.md), [Mac bridge plan](docs/MAC_BRIDGE.md), [Legacy Mac audit](docs/LEGACY_MAC_AUDIT.md), [Phase 1 execution](docs/PHASE1_EXECUTION.md), [operations](docs/OPERATIONS.md), [Security](SECURITY.md), and [Roadmap](docs/ROADMAP.md).
+See [Requirements](docs/REQUIREMENTS.md), [traceability](docs/TRACEABILITY.md), [tool contracts](docs/TOOL_CONTRACTS.md), [Architecture](docs/ARCHITECTURE.md), [pyiCloud stabilization gate](docs/PYICLOUD_STABILIZATION.md), [Approval policies](docs/APPROVAL_POLICIES.md), [conditional Mac bridge plan](docs/MAC_BRIDGE.md), [Legacy Mac audit](docs/LEGACY_MAC_AUDIT.md), [Phase 1 execution](docs/PHASE1_EXECUTION.md), [operations](docs/OPERATIONS.md), [Security](SECURITY.md), and [Roadmap](docs/ROADMAP.md).
 
 ## Repository layout
 

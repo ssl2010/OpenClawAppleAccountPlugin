@@ -11,7 +11,7 @@
 
 Exit: clean build, plugin validation, unit tests, and local install smoke test.
 
-## Phase 1 — authentication and read-only Calendar
+## Phase 1 — pyiCloud authentication and read-only Calendar
 
 - Extract and refactor the proven InkBoard authentication flow.
 - Store password outside OpenClaw configuration and model context.
@@ -19,10 +19,23 @@ Exit: clean build, plugin validation, unit tests, and local install smoke test.
 - Add `apple_account_status` and typed auth errors.
 - Add calendar list/get tools with timezone normalization and pagination limits.
 - Add sanitized fixture and live opt-in integration tests.
+- Deploy with pyiCloud as the only eligible provider; do not implement Mac routing yet.
 
 Exit: US1 can answer a Feishu request for upcoming events without leaking credentials or raw upstream data.
 
-## Phase 1B — legacy Mac bridge foundation
+## Phase 1S — pyiCloud stabilization gate
+
+- Operate pyiCloud without a Mac fallback for at least 30 consecutive days and 500 representative read operations; extend the window until both conditions are met.
+- Exercise session reuse, planned US1 restarts, transient network loss, expired authentication, pagination, timezones, rate limits, and upstream schema fingerprints.
+- Record availability, p50/p95 latency, typed-error rate, reauthentication frequency, correctness samples, and operator interventions.
+- Require zero credential leaks, zero silent data corruption, zero retry storms, and zero duplicate mutations before advancing.
+- Produce a stabilization report mapping every unmet target or missing capability to user impact and mitigation.
+
+Exit: pyiCloud meets the agreed service objectives, or the report contains concrete evidence that an optional Mac provider is necessary.
+
+## Conditional Phase M — legacy Mac provider
+
+Start this phase only after an explicit decision based on the Phase 1S report. If pyiCloud is sufficient, skip it and keep the retired Mac bridge off.
 
 - [x] Inventory macOS version, CPU architecture, available runtimes, local network, and current keep-awake job.
 - [x] Retire the obsolete Calendar tunnel/sync and StatusTool LaunchAgents while preserving their source for reference.
@@ -31,7 +44,7 @@ Exit: US1 can answer a Feishu request for upcoming events without leaking creden
 - Implement native Calendar reads and compare normalized results with pyiCloud.
 - Add provider health, routing, and reconciliation tests.
 
-Exit: the Mac is preferred while healthy and Calendar reads safely fall back to pyiCloud while it is offline.
+Exit: only the documented pyiCloud gaps are filled, routing is capability-specific, and enabling the Mac has a demonstrated benefit greater than its operational and energy cost.
 
 ## Phase 2 — read-only Reminders
 
@@ -56,15 +69,15 @@ Exit: stable read-only reminder queries through Feishu.
 
 Exit: approved mutations are reliable and duplicate-safe.
 
-## Phase 4 — Notes through the Mac, with pyiCloud feasibility gate
+## Phase 4 — Notes feasibility gate
 
 - Document available Notes endpoints and authentication behavior.
 - Build a read-only prototype with sanitized fixtures.
-- Implement native read-only Notes through the custom Mac bridge.
-- Compare any pyiCloud/web adapter only as an optional fallback.
+- Evaluate a pyiCloud-compatible read-only adapter first.
+- Implement native read-only Notes through the custom Mac bridge only if Notes remains required and Phase M is approved.
 - Perform a security review before exposing any model-visible Notes tool.
 
-Exit: ship Mac-backed read-only Notes; add pyiCloud fallback only if it independently meets reliability and security gates.
+Exit: ship Notes only through a provider that independently meets reliability and security gates; otherwise report it as unsupported.
 
 ## Phase 5 — optional services and release
 

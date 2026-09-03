@@ -13,17 +13,19 @@ TypeScript tool plugin
   - capability routing and provider health
   - timeout, idempotency, cancellation, redaction
         |
-        +---------------- preferred ----------------+
-        |                                            |
-Mutually authenticated Mac bridge              Python bridge on US1
-  - native Calendar/Reminders/Notes              - pyiCloud session handling
-  - legacy-mac-compatible runtime                - Calendar/CloudKit adapters
-  - no OpenClaw installation                     - tested fallback capabilities
-        |                                            |
-macOS applications/frameworks                    Apple private web services
+        |
+Python bridge on US1
+  - pyiCloud session handling
+  - Calendar/CloudKit adapters
+  - sole provider during stabilization
+        |
+Apple private web services
+
+Conditional after stabilization gate:
+TypeScript tool plugin -> authenticated Mac bridge -> macOS frameworks
 ```
 
-The Mac bridge is the preferred provider while it is online and healthy. It is a small, independently deployable daemon compatible with the actual legacy macOS version; it does not embed or require OpenClaw. The US1 plugin selects a provider per capability rather than assuming both providers are equivalent.
+The pyiCloud bridge is the sole initial provider. This intentionally prevents a native Mac path from masking pyiCloud failures. The Mac design remains available as a contingency, but no Mac runtime is implemented or enabled until measured evidence passes the decision gate.
 
 The pyiCloud implementation uses one short-lived Python subprocess per invocation. This keeps failure isolation simple and avoids another local network port. A persistent pyiCloud sidecar may be considered only if measured latency justifies it.
 
@@ -42,8 +44,10 @@ Possible implementations are a small Swift agent, a compatible Python agent, or 
 
 ## Provider routing and failover
 
-- Prefer the Mac only when its capability is advertised and health is fresh.
-- Use pyiCloud for a read when the Mac is offline, times out before executing, or lacks that capability.
+- Route all Phase 1 operations to pyiCloud and expose its errors directly as typed results.
+- Do not silently route around pyiCloud during the stabilization window.
+- After the stabilization report, keep pyiCloud-only routing if it meets the service objectives.
+- Add a Mac provider only for explicitly documented gaps, and define routing separately when that decision is made.
 - For writes, choose exactly one provider before dispatch.
 - Never retry a timed-out write through the other provider unless the first provider proves it did not commit.
 - Reconcile by stable identifier after reconnect and report conflicts instead of silently overwriting.

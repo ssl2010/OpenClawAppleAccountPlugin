@@ -2,7 +2,9 @@
 
 ## Purpose
 
-Use an older, always-on Mac as the preferred Apple-data provider without installing OpenClaw on it. The OpenClaw plugin remains on US1 and routes supported requests to the Mac bridge while it is healthy. pyiCloud provides tested fallback capabilities when the Mac is unavailable.
+This is a conditional design, not the initial implementation path. Develop and stabilize pyiCloud on US1 first. Use the older Mac only if the Phase 1S report proves that a required capability or service objective cannot be met by pyiCloud and the operator explicitly approves the additional energy and maintenance cost.
+
+Until that gate is passed, keep the retired Mac bridge disabled and do not let native reads mask pyiCloud defects.
 
 ## Discovery checklist
 
@@ -72,7 +74,7 @@ Reuse the predecessor's split design:
 - a loopback-only lightweight status endpoint;
 - a minimal native shell compatible with macOS 11;
 - separate provider, transport, permission, sync, and last-error states;
-- explicit `Mac primary`, `pyiCloud fallback`, or `unavailable` effective routing;
+- explicit provider and unavailable states; the exact Mac/pyiCloud precedence is decided only if Conditional Phase M is approved;
 - no credentials or private Calendar/Notes contents in status output.
 
 The status service must not be a control plane in v1. Mutating controls remain in OpenClaw with approval enforcement.
@@ -87,6 +89,8 @@ The status service must not be a control plane in v1. Mutating controls remain i
 - Do not copy the Mac login password, Keychain database, or native account tokens to US1.
 
 ## Acceptance tests
+
+These tests apply only after Conditional Phase M is approved:
 
 - Reboot and login recovery.
 - Sleep/wake and network-loss recovery.

@@ -15,7 +15,7 @@ This document is the normative product baseline. Architecture and implementation
 
 ### Account and provider state
 
-- **FR-001** Report Mac, pyiCloud, and effective-provider health independently.
+- **FR-001** Report pyiCloud authentication, service, and effective-provider health; report Mac health only if the optional provider is later enabled.
 - **FR-002** Report authentication or TCC permission failures without exposing credentials or raw upstream responses.
 - **FR-003** Route each operation only to a provider that advertises the exact capability.
 - **FR-004** Include provider and observation freshness in every data result.
@@ -44,13 +44,13 @@ Soft cancellation is idempotent: an already prefixed event is not prefixed again
 - **FR-205** Complete a reminder idempotently.
 - **FR-206** Delete a reminder only after exact target resolution.
 
-### Apple Notes — v1
+### Apple Notes — conditional v1 capability
 
-- **FR-300** List note metadata through the Mac provider only.
-- **FR-301** Search note titles and bodies through the Mac provider only.
-- **FR-302** Read one note through the Mac provider only.
+- **FR-300** List note metadata only after either a pyiCloud-compatible adapter or the optional Mac provider passes its research gate.
+- **FR-301** Search note titles and bodies only through a provider that passes that gate.
+- **FR-302** Read one note only through a provider that passes that gate.
 - **FR-303** Notes is read-only in v1.
-- **FR-304** When the Mac is offline, return a typed `CAPABILITY_UNAVAILABLE` result; do not silently use browser automation.
+- **FR-304** When no qualified Notes provider is enabled, return a typed `CAPABILITY_UNAVAILABLE` result; do not silently use browser automation.
 
 ### Pre-approved automations
 
@@ -74,13 +74,14 @@ Soft cancellation is idempotent: an already prefixed event is not prefixed again
 
 ## Provider routing requirements
 
-- **PR-001** Prefer the Mac when its heartbeat is fresh, permission probe passes, and the capability is advertised.
-- **PR-002** Reads may automatically fall back to pyiCloud and must disclose the selected provider.
+- **PR-001** Use pyiCloud as the sole production provider during initial implementation and stabilization.
+- **PR-002** Do not enable Mac fallback during the pyiCloud stabilization window; every result and error must disclose the selected provider.
 - **PR-003** Select exactly one provider before dispatching a write.
 - **PR-004** Never retry a write through another provider after an ambiguous timeout.
 - **PR-005** Reconcile an ambiguous write by idempotency key or exact stable identifier before permitting any retry.
-- **PR-006** Notes has no pyiCloud fallback in v1.
+- **PR-006** Notes remains unavailable until a provider independently passes its reliability and security gate.
 - **PR-007** Provider disagreement is surfaced as a conflict; destructive actions never use fuzzy matching.
+- **PR-008** Mac implementation requires a stabilization report showing a pyiCloud capability gap or an unmet service objective and an explicit decision to proceed.
 
 ## Security requirements
 
@@ -97,21 +98,21 @@ Soft cancellation is idempotent: an already prefixed event is not prefixed again
 
 ## Reliability and performance requirements
 
-- **NFR-001** Mac bridge restarts at login and reconnects with capped exponential backoff.
+- **NFR-001** The pyiCloud path runs independently of the Mac; if a Mac bridge is later enabled, it restarts at login and reconnects with capped exponential backoff.
 - **NFR-002** A collector crash does not crash OpenClaw Gateway.
 - **NFR-003** State and logs use atomic writes and bounded retention.
 - **NFR-004** Default list limits prevent unbounded account downloads.
-- **NFR-005** Read request target: 95th percentile under 5 seconds with Mac and under 15 seconds with pyiCloud, excluding reauthentication.
+- **NFR-005** pyiCloud read target: 95th percentile under 15 seconds, excluding interactive reauthentication.
 - **NFR-006** Write request target: 30-second deadline plus explicit unknown-outcome handling.
 - **NFR-007** Heartbeat interval is 30 seconds; Mac becomes degraded after 75 seconds and offline after 120 seconds.
 - **NFR-008** The bridge remains within the old Mac's 4 GB memory envelope and avoids containers, browsers, and resident model processes.
-- **NFR-009** Automatic macOS login is not required or enabled; after reboot the Mac provider remains offline until the operator logs into the GUI session, while supported reads use pyiCloud fallback.
+- **NFR-009** Automatic macOS login is not required or enabled. If the optional Mac provider is later approved, it remains offline after reboot until the operator logs into the GUI session; pyiCloud continues independently.
 
 ## Definition of done for v1
 
 - Every FR, PR, SR, and NFR has an automated test, an explicit manual acceptance step, or a documented reason it cannot be automated.
-- Calendar and Reminders pass Mac-primary and pyiCloud-fallback tests.
-- Notes read-only passes Mac online/offline behavior tests.
+- Calendar and Reminders pass pyiCloud fixture, live, failure-injection, and stabilization tests.
+- Notes is either independently qualified or explicitly reported as unavailable; it does not force Mac deployment.
 - At least one pre-approved automation completes safely and revocation is demonstrated.
-- Reboot, sleep/wake, network loss, expired session, TCC revocation, and ambiguous-write scenarios pass.
+- US1 reboot, network loss, expired session, rate limit, schema drift, and ambiguous-write scenarios pass. Mac-specific scenarios apply only if the optional provider is approved.
 - OpenClaw security audit reports zero critical findings caused by this plugin.

@@ -9,8 +9,8 @@ Provide a small, auditable set of OpenClaw tools for the repository owner's Appl
 - One trusted operator.
 - OpenClaw Gateway runs continuously on US1 Linux.
 - Commands arrive primarily through the allowlisted Feishu channel.
-- A legacy, always-on Mac runs a purpose-built bridge but does not run OpenClaw.
-- The Mac provider is preferred when online; pyiCloud on US1 is the fallback.
+- pyiCloud on US1 is the initial production provider and must be evaluated without fallback.
+- A legacy Mac bridge is optional and remains off unless measured gaps justify its energy and maintenance cost.
 - Apple authentication is completed interactively by the operator and reused through a protected session.
 
 This is not a multi-tenant service and must not expose one Apple session to multiple unrelated users.
