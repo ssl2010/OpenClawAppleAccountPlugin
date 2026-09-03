@@ -8,7 +8,9 @@ The Mac daemon listens on `127.0.0.1:19090`. A dedicated SSH client creates:
 US1 127.0.0.1:19091 -> SSH reverse forward -> Mac 127.0.0.1:19090
 ```
 
-The SSH key is restricted with `permitlisten="127.0.0.1:19091"`, cannot open a PTY, and is independent from management and GitHub keys. US1's Ed25519 host key is stored in a dedicated known-hosts file on the Mac with strict checking.
+The SSH key is restricted with `restrict`, `port-forwarding`, `permitlisten="127.0.0.1:19091"`, and `command="/usr/bin/false"`. It can establish only the approved reverse listener and cannot open a PTY or execute a remote command. It is independent from management and GitHub keys. US1's Ed25519 host key is stored in a dedicated known-hosts file on the Mac with strict checking.
+
+The provisioning acceptance test confirmed all three properties: remote command execution is rejected, the loopback-only reverse forward carries application traffic successfully, and the US1 listener disappears after the SSH client exits.
 
 The application protocol is HTTP/1.1 with JSON because both macOS 11 Foundation and US1 Node/Python support it without a heavy runtime. It remains loopback-only on both hosts and is additionally authenticated.
 

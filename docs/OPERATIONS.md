@@ -10,7 +10,7 @@
 
 - Local to US1: SSH alias `US1-DANIEL`.
 - Local to legacy Mac: SSH alias `OLD-MAC-APPLE-BRIDGE` using a dedicated administration key.
-- Legacy Mac to US1: dedicated forwarding-only key and dedicated known-hosts file.
+- Legacy Mac to US1: dedicated forwarding-only key, forced command rejection, a single permitted loopback listener (`127.0.0.1:19091`), and a dedicated known-hosts file.
 - GitHub: repository-specific deploy key; never reuse the bridge transport key.
 
 ## Directory layout
