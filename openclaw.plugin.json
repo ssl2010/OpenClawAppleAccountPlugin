@@ -1,0 +1,38 @@
+{
+  "id": "apple-account",
+  "name": "Apple Account",
+  "description": "Security-focused tools for personal Apple account data.",
+  "version": "0.1.0",
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "pythonPath": {
+        "type": "string"
+      },
+      "sessionDirectory": {
+        "type": "string"
+      },
+      "region": {
+        "anyOf": [
+          {
+            "type": "string",
+            "const": "global"
+          },
+          {
+            "type": "string",
+            "const": "china"
+          }
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "contracts": {
+    "tools": [
+      "apple_account_capabilities"
+    ]
+  }
+}

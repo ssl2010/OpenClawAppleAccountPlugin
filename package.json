@@ -1,0 +1,49 @@
+{
+  "name": "@ssl2010/openclaw-apple-account",
+  "version": "0.1.0",
+  "description": "Security-focused OpenClaw tools for personal Apple account data.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=24.15.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "plugin:build": "npm run build && openclaw plugins build --entry ./dist/index.js",
+    "plugin:validate": "npm run plugin:build && openclaw plugins validate --entry ./dist/index.js",
+    "test": "vitest run",
+    "check": "npm run plugin:validate && npm test"
+  },
+  "dependencies": {
+    "typebox": "1.3.17"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "openclaw": "2026.8.2",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.8.2"
+  },
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "compat": {
+      "pluginApi": ">=2026.8.2",
+      "minGatewayVersion": "2026.8.2"
+    },
+    "build": {
+      "openclawVersion": "2026.8.2",
+      "pluginSdkVersion": "2026.8.2"
+    }
+  },
+  "files": [
+    "dist/",
+    "openclaw.plugin.json",
+    "python/",
+    "skills/",
+    "README.md"
+  ]
+}
