@@ -22,7 +22,7 @@ The plugin uses three intentionally separate layers:
 
 Provider routing is capability-aware. The Mac is preferred while online; pyiCloud is used only for capabilities that have a tested fallback. Mutations never fail over after an ambiguous result.
 
-See [Architecture](docs/ARCHITECTURE.md), [Mac bridge plan](docs/MAC_BRIDGE.md), [Product scope](docs/PRODUCT_SCOPE.md), [Security](SECURITY.md), and [Roadmap](docs/ROADMAP.md).
+See [Architecture](docs/ARCHITECTURE.md), [Mac bridge plan](docs/MAC_BRIDGE.md), [Legacy Mac audit](docs/LEGACY_MAC_AUDIT.md), [Product scope](docs/PRODUCT_SCOPE.md), [Security](SECURITY.md), and [Roadmap](docs/ROADMAP.md).
 
 ## Repository layout
 

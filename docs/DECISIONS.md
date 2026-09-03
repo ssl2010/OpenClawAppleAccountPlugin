@@ -54,9 +54,14 @@ Contacts and iCloud Drive remain post-v1 candidates. V1 focuses on account/sessi
 
 An operator may create a bounded, revocable approval policy for recurring automation writes. Prompt text cannot create or widen a policy, and every use is audited.
 
+## ADR-010: macOS 11-compatible native bridge
+
+**Status:** accepted after host audit.
+
+The primary bridge targets an Intel MacBook Air running macOS 11.7.11 with 4 GB RAM. Calendar and Reminders use a small Swift/EventKit helper, proven by the predecessor deployment. A lightweight supervisor, outbound reverse-SSH-style transport, and loopback-only status surface may reuse the predecessor's operational patterns. Notes uses a separate native/JXA adapter. OpenClaw, containers, browser automation, and model inference remain off this Mac.
+
 ## Decisions still needed from the owner
 
-1. Mac inventory: exact macOS version, CPU model/architecture, available Python version, and whether Homebrew can run.
-2. Mac network: same LAN, public reachability, existing reverse SSH/Tailscale, and sleep/wake behavior.
-3. Soft-cancel representation: title prefix, dedicated calendar, note/status marker, or another convention.
-4. Default pre-approval limits: maximum writes per run/day and approval expiry.
+1. Soft-cancel representation: title prefix, dedicated calendar, note/status marker, or another convention.
+2. Default pre-approval limits: maximum writes per run/day and approval expiry.
+3. Whether the Mac will normally remain logged in after reboot, which is required for user-context TCC access.

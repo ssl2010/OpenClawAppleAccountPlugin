@@ -17,7 +17,7 @@ Record these facts before selecting an implementation language or transport:
 - Sleep, wake-on-network-access, automatic-login, power-recovery, and UPS behavior.
 - Network path to US1, including any existing reverse SSH or Tailscale option.
 
-No implementation choice is final until this inventory is captured.
+The initial inventory is captured in [Legacy Mac audit](LEGACY_MAC_AUDIT.md). The selected baseline is a native Swift/EventKit helper plus a lightweight supervisor and outbound authenticated transport. Notes will use a separately permissioned native/JXA adapter because EventKit does not expose Notes.
 
 ## Minimum daemon contract
 
@@ -53,17 +53,29 @@ Every response identifies `provider`, `observedAt`, and freshness. Merged result
 
 ## Candidate implementations
 
-### Swift/Foundation daemon
+### Swift/Foundation daemon — selected baseline
 
-Preferred if the installed macOS/Xcode toolchain can compile and run the required EventKit and Notes automation interfaces. It offers native frameworks and privacy prompts but may be constrained by the old OS.
+The deployed predecessor proved that macOS 11.7.11 and this Intel Mac can compile and run a small EventKit binary reliably. Use Swift/Foundation for Calendar and Reminders collection and mutation. Keep the deployment target compatible with macOS 11 and avoid new concurrency/runtime features that require newer systems.
 
-### Python daemon
+### Python supervisor/status service — supporting role
 
-Preferred if a maintained Python runtime already exists and native access can be implemented through stable bridges. It is easier to share schemas with the pyiCloud adapter but must not depend on obsolete TLS or unmaintained binary packages.
+Homebrew Python 3.14.3 is available, while launchd's `/usr/bin/python3` resolves to an older Command Line Tools runtime. If Python is used for transport or the status service, the LaunchAgent must reference the explicit Homebrew interpreter and run a startup preflight. Native Apple data access remains in the Swift helper.
 
-### Reverse-SSH stdio bridge
+### Reverse-SSH stdio bridge — initial transport candidate
 
-Useful as an initial transport or recovery mechanism. It reuses mature SSH authentication and requires no inbound Mac port, but application-level schemas, timeouts, idempotency, and audit controls are still required.
+The predecessor used reverse SSH successfully until the remote server was reinstalled and its host key changed. Reverse SSH remains the initial transport candidate because it is available on macOS 11 and requires no inbound Mac port. The new deployment must use one dedicated bridge key, a separately verified US1 host key, a forced server-side command where practical, and one tunnel implementation rather than competing tunnel jobs.
+
+## Status surface direction
+
+Reuse the predecessor's split design:
+
+- a loopback-only lightweight status endpoint;
+- a minimal native shell compatible with macOS 11;
+- separate provider, transport, permission, sync, and last-error states;
+- explicit `Mac primary`, `pyiCloud fallback`, or `unavailable` effective routing;
+- no credentials or private Calendar/Notes contents in status output.
+
+The status service must not be a control plane in v1. Mutating controls remain in OpenClaw with approval enforcement.
 
 ## Deployment security
 

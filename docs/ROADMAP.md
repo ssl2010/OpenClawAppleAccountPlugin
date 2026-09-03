@@ -24,8 +24,9 @@ Exit: US1 can answer a Feishu request for upcoming events without leaking creden
 
 ## Phase 1B — legacy Mac bridge foundation
 
-- Inventory macOS version, CPU architecture, available runtimes, network, power, and sleep behavior.
-- Select the smallest compatible daemon implementation.
+- [x] Inventory macOS version, CPU architecture, available runtimes, local network, and current keep-awake job.
+- [x] Retire the obsolete Calendar tunnel/sync and StatusTool LaunchAgents while preserving their source for reference.
+- Use a macOS 11-compatible Swift/EventKit helper with a lightweight supervisor/status layer.
 - Implement outbound authenticated transport, heartbeat, capability advertisement, and reconnect.
 - Implement native Calendar reads and compare normalized results with pyiCloud.
 - Add provider health, routing, and reconciliation tests.
