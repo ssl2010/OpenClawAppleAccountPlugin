@@ -9,6 +9,8 @@ Provide a small, auditable set of OpenClaw tools for the repository owner's Appl
 - One trusted operator.
 - OpenClaw Gateway runs continuously on US1 Linux.
 - Commands arrive primarily through the allowlisted Feishu channel.
+- A legacy, always-on Mac runs a purpose-built bridge but does not run OpenClaw.
+- The Mac provider is preferred when online; pyiCloud on US1 is the fallback.
 - Apple authentication is completed interactively by the operator and reused through a protected session.
 
 This is not a multi-tenant service and must not expose one Apple session to multiple unrelated users.
@@ -22,9 +24,10 @@ This is not a multi-tenant service and must not expose one Apple session to mult
 - Read one event by stable identifier.
 - Create an event after confirmation.
 - Update an event after confirmation.
-- Cancel/delete an event after confirmation.
+- Delete an event by default after confirmation.
+- Soft-cancel only when the user explicitly requests preservation instead of deletion.
 
-Recurring-event behavior must be explicit: one occurrence versus the entire series.
+Recurring-event behavior must be explicit: one occurrence versus the entire series. A soft-cancel operation must preserve the item and apply a clearly documented marker instead of pretending Apple provides a universal cancellation state.
 
 ### Reminders
 
@@ -54,7 +57,7 @@ pyiCloud does not currently provide a stable, supported Notes service. Notes wor
 
 No write or delete capability will be attempted before read-only reliability is demonstrated.
 
-## Later candidates
+## Later candidates, outside v1
 
 - Contacts search and read.
 - Narrowly scoped iCloud Drive listing and download.
@@ -73,5 +76,7 @@ No write or delete capability will be attempted before read-only reliability is 
 - Read tools produce stable normalized JSON and never leak raw session data.
 - Every mutation is idempotent or protected by a caller-supplied idempotency key.
 - Destructive actions require explicit confirmation and precise target identifiers.
+- A stored, revocable approval policy may authorize a bounded automation to mutate without per-run confirmation.
+- Provider failover never duplicates a mutation after an ambiguous timeout.
 - Session expiry produces a typed reauthentication error rather than retry storms.
 - Unit, contract, fixture, security, and US1 smoke tests pass.

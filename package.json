@@ -2,6 +2,7 @@
   "name": "@ssl2010/openclaw-apple-account",
   "version": "0.1.0",
   "description": "Security-focused OpenClaw tools for personal Apple account data.",
+  "license": "Apache-2.0",
   "type": "module",
   "private": true,
   "engines": {
@@ -44,6 +45,7 @@
     "openclaw.plugin.json",
     "python/",
     "skills/",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ]
 }

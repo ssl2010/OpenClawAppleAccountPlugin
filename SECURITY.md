@@ -13,9 +13,12 @@ This plugin handles highly sensitive personal data through private Apple web int
 - Read and mutation tools are separately allowlisted.
 - Account content is treated as untrusted input and cannot override system or skill instructions.
 - Every mutation validates an exact target and uses an idempotency key.
+- Pre-approved automation writes require a stored, bounded, revocable policy; prompt text is never an approval grant.
+- A write is never retried through another provider after an ambiguous timeout.
 - Destructive or security-sensitive Apple device actions are not registered.
 - Unknown upstream schemas fail closed, especially for writes.
 - Authentication retries are bounded to prevent 2FA spam and Apple account lockouts.
+- The Mac bridge uses a dedicated device identity, advertises only explicit capabilities, accepts no generic shell commands, and keeps native credentials on the Mac.
 
 ## Logging and diagnostics
 

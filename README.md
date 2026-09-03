@@ -1,6 +1,6 @@
 # OpenClaw Apple Account Plugin
 
-A security-focused OpenClaw tool plugin for accessing personal Apple account data from a Linux-hosted OpenClaw Gateway.
+A security-focused OpenClaw tool plugin for accessing personal Apple account data through a Linux-hosted OpenClaw Gateway and an optional legacy macOS bridge.
 
 > Project status: architecture and build scaffold. No Apple account data is accessed yet.
 
@@ -14,12 +14,15 @@ A security-focused OpenClaw tool plugin for accessing personal Apple account dat
 
 ## Architecture
 
-The plugin uses two intentionally separate layers:
+The plugin uses three intentionally separate layers:
 
 1. A TypeScript OpenClaw tool plugin owns typed tool contracts, permission boundaries, validation, and model-visible results.
-2. A private Python bridge owns pyiCloud authentication, session reuse, Apple response normalization, and network calls.
+2. A lightweight bridge on an always-on Mac is the preferred provider when healthy and accesses native Apple applications without requiring OpenClaw on that Mac.
+3. A private Python bridge on US1 owns pyiCloud authentication, session reuse, response normalization, and fallback network calls.
 
-See [Architecture](docs/ARCHITECTURE.md), [Product scope](docs/PRODUCT_SCOPE.md), [Security](SECURITY.md), and [Roadmap](docs/ROADMAP.md).
+Provider routing is capability-aware. The Mac is preferred while online; pyiCloud is used only for capabilities that have a tested fallback. Mutations never fail over after an ambiguous result.
+
+See [Architecture](docs/ARCHITECTURE.md), [Mac bridge plan](docs/MAC_BRIDGE.md), [Product scope](docs/PRODUCT_SCOPE.md), [Security](SECURITY.md), and [Roadmap](docs/ROADMAP.md).
 
 ## Repository layout
 
@@ -57,4 +60,4 @@ Never commit Apple IDs, passwords, 2FA codes, cookies, session files, raw accoun
 
 ## License
 
-No open-source license has been selected. The repository remains all-rights-reserved until the owner chooses a license.
+Licensed under the [Apache License 2.0](LICENSE).

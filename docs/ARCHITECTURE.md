@@ -10,19 +10,44 @@ OpenClaw Gateway on US1
 TypeScript tool plugin
   - TypeBox input/output schemas
   - tool policy and confirmation boundary
-  - timeout, cancellation, redaction
+  - capability routing and provider health
+  - timeout, idempotency, cancellation, redaction
         |
-JSON request/response over subprocess stdio
-        |
-Python bridge
-  - pyiCloud session handling
-  - Apple/CloudKit adapters
-  - normalization and typed errors
-        |
-Apple private web services
+        +---------------- preferred ----------------+
+        |                                            |
+Mutually authenticated Mac bridge              Python bridge on US1
+  - native Calendar/Reminders/Notes              - pyiCloud session handling
+  - legacy-mac-compatible runtime                - Calendar/CloudKit adapters
+  - no OpenClaw installation                     - tested fallback capabilities
+        |                                            |
+macOS applications/frameworks                    Apple private web services
 ```
 
-The first implementation uses one short-lived Python subprocess per tool invocation. This keeps failure isolation simple and avoids opening a local network port. A persistent sidecar may be considered only if measured latency justifies the additional lifecycle and security complexity.
+The Mac bridge is the preferred provider while it is online and healthy. It is a small, independently deployable daemon compatible with the actual legacy macOS version; it does not embed or require OpenClaw. The US1 plugin selects a provider per capability rather than assuming both providers are equivalent.
+
+The pyiCloud implementation uses one short-lived Python subprocess per invocation. This keeps failure isolation simple and avoids another local network port. A persistent pyiCloud sidecar may be considered only if measured latency justifies it.
+
+## Mac bridge transport
+
+The default design is an outbound connection from the Mac to US1 so no inbound Mac port must be exposed. Final transport selection follows an inventory of the Mac's OS, CPU, TLS support, Python/Swift availability, and network location. Required properties are:
+
+- Mutual device authentication with a separately revocable key.
+- Capability advertisement and health heartbeat.
+- Request IDs, deadlines, idempotency keys, and signed responses.
+- A strict command allowlist; no generic shell execution.
+- Credentials remain in the macOS user context and are never copied to US1.
+- Automatic reconnect with bounded backoff.
+
+Possible implementations are a small Swift agent, a compatible Python agent, or a reverse-SSH stdio service. The oldest supportable and least privileged option will be selected after hardware inventory.
+
+## Provider routing and failover
+
+- Prefer the Mac only when its capability is advertised and health is fresh.
+- Use pyiCloud for a read when the Mac is offline, times out before executing, or lacks that capability.
+- For writes, choose exactly one provider before dispatch.
+- Never retry a timed-out write through the other provider unless the first provider proves it did not commit.
+- Reconcile by stable identifier after reconnect and report conflicts instead of silently overwriting.
+- Notes may be Mac-only if no reliable pyiCloud adapter passes the research gate.
 
 ## Protocol
 
@@ -30,6 +55,7 @@ The first implementation uses one short-lived Python subprocess per tool invocat
 - Logs go to stderr and pass through redaction.
 - Every message contains `protocolVersion`.
 - Mutations contain an idempotency key.
+- Requests identify the selected provider and approval-policy reference.
 - Responses contain normalized data only; raw Apple headers, cookies, URLs with tokens, and account bootstrap payloads are forbidden.
 
 Initial error codes:
@@ -73,11 +99,25 @@ Tools are introduced in risk order:
 5. `apple_reminders_list_lists`
 6. `apple_reminders_list`
 7. `apple_reminders_get`
-8. Create/update tools with confirmation and idempotency
-9. Cancel/complete/delete tools with stricter confirmation
+8. Create/update tools with confirmation or a matching stored approval and idempotency
+9. Delete-by-default and explicit soft-cancel tools with stricter confirmation
 10. Notes read-only tool only after the research gate passes
 
 Read and write tools should be separately controllable by OpenClaw tool policy.
+
+## Pre-approved automation writes
+
+An approval is data, not a prompt phrase. Each stored approval is revocable and constrains:
+
+- tool/action names;
+- target calendars or reminder lists;
+- allowed field patterns and maximum item count;
+- schedule or expiry;
+- channel/requester identity;
+- selected provider behavior;
+- audit-log destination.
+
+Any request outside the exact policy returns `APPROVAL_REQUIRED`. Account content cannot create or broaden an approval.
 
 ## Time and identity
 
