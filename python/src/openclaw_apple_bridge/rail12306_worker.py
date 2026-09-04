@@ -121,8 +121,10 @@ def apply_plan(
             raise BridgeError("CONFLICT", "Partial or legacy itinerary refund requires review.")
         segment = segments[0]
         identity = f"{segment['train']}｜{segment['originStation']}→{segment['destinationStation']}｜"
-        departure = parse_rfc3339(str(segment["departure"])).strftime("%Y-%m-%d %H:%M")
-        if identity not in managed_lines[0] or departure not in managed_lines[0]:
+        departure = parse_rfc3339(str(segment["departure"]))
+        # Full date identity belongs to the event, not its human-readable notes.
+        if (identity not in managed_lines[0] or not exact[0].get("start")
+                or parse_rfc3339(str(exact[0]["start"])) != departure):
             raise BridgeError("CONFLICT", "Refund segment does not match the managed event.")
         if not apply:
             return {"action": "would-delete", "count": len(exact)}

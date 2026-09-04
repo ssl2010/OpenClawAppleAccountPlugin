@@ -263,10 +263,15 @@ def format_itinerary_notes(
         gate = segment.get("gate") or "待定"
         departure = segment["departure"]
         arrival = segment.get("arrival") or departure + timedelta(minutes=10)
-        time_range = (
-            f"{departure.strftime('%Y-%m-%d %H:%M')}–"
-            f"{arrival.strftime('%Y-%m-%d %H:%M')}"
-        )
+        time_range = f"{departure:%H:%M}–{arrival:%H:%M}"
+        day_offset = (arrival.date() - itinerary["segments"][0]["departure"].date()).days
+        annotations = []
+        if day_offset > 0:
+            annotations.append("次日" if day_offset == 1 else f"第{day_offset + 1}日")
+        if arrival.utcoffset() != departure.utcoffset():
+            annotations.append("当地时间")
+        if annotations:
+            time_range += "（" + "，".join(annotations) + "）"
         if timetable_status != "resolved":
             time_range += "（时刻表待补充）"
         lines.append(
