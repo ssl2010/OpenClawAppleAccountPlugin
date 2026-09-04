@@ -93,7 +93,11 @@ def apply_plan(
             "limit": 500,
         }
     )
-    exact = [item for item in existing if plan["lookup"]["marker"] in item["notes"]]
+    tracking_url = event.get("url")
+    exact = [item for item in existing if (
+        (tracking_url and item.get("url") == tracking_url)
+        or plan["lookup"]["marker"] in item["notes"]
+    )]
     if len(existing) >= 500:
         raise BridgeError("CONFLICT", "Calendar query may be truncated; review is required.")
     if plan["operation"] == "reconcile-update" and not exact:

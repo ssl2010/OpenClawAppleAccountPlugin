@@ -66,7 +66,7 @@ def test_transfer_merge_and_layout() -> None:
     assert len(plan) == 1
     assert plan[0]["event"]["title"] == "火车行程：武汉→上海"
     lines = plan[0]["event"]["notes"].splitlines()
-    assert [line[:2] for line in lines[1:4]] == ["1.", "2.", "3."]
+    assert [line[:2] for line in lines[:3]] == ["1.", "2.", "3."]
     assert lines[-1] == "from OpenClaw US1"
 
 
@@ -90,7 +90,7 @@ def test_refund_never_deletes_unmanaged_event() -> None:
 
 def test_refund_ambiguous_duplicate_markers_fail_closed() -> None:
     plan = plan_email(params("用户退票通知"))["plans"][0]
-    provider = FakeProvider([{"eventId": str(i), "notes": plan["event"]["notes"]} for i in range(2)])
+    provider = FakeProvider([{"eventId": str(i), **plan["event"]} for i in range(2)])
     with pytest.raises(BridgeError):
         apply_plan(provider, plan, "cal-1", apply=True)  # type: ignore[arg-type]
     assert provider.deleted == []
@@ -98,7 +98,7 @@ def test_refund_ambiguous_duplicate_markers_fail_closed() -> None:
 
 def test_refund_exact_single_segment_deletes_once() -> None:
     plan = plan_email(params("用户退票通知"))["plans"][0]
-    provider = FakeProvider([{"eventId": "managed", "notes": plan["event"]["notes"]}])
+    provider = FakeProvider([{"eventId": "managed", **plan["event"]}])
     apply_plan(provider, plan, "cal-1", apply=True)  # type: ignore[arg-type]
     assert provider.deleted == [{"calendarId": "cal-1", "eventId": "managed"}]
 
@@ -107,7 +107,7 @@ def test_partial_transfer_refund_requires_review() -> None:
     body = "订单号码 ZZ12345678。" + ticket("武汉", "南京", "G1", "08:00")
     complete = plan_email(params(body=body + ticket("南京", "上海", "G2", "12:00")))["plans"][0]
     refund = plan_email(params("用户退票通知", body))["plans"][0]
-    provider = FakeProvider([{"eventId": "managed", "notes": complete["event"]["notes"]}])
+    provider = FakeProvider([{"eventId": "managed", **complete["event"]}])
     with pytest.raises(BridgeError):
         apply_plan(provider, refund, "cal-1", apply=True)  # type: ignore[arg-type]
     assert provider.deleted == []
@@ -115,8 +115,8 @@ def test_partial_transfer_refund_requires_review() -> None:
 
 def test_change_must_not_match_different_order_same_passenger() -> None:
     plan = plan_email(params("用户改签通知"))["plans"][0]
-    notes = plan["event"]["notes"].replace("ZZ12345678", "ZZ87654321")
-    provider = FakeProvider([{"eventId": "unrelated", "notes": notes}])
+    other = plan_email(params(body=params()["body"].replace("ZZ12345678", "ZZ87654321")))["plans"][0]
+    provider = FakeProvider([{"eventId": "unrelated", **other["event"]}])
     with pytest.raises(BridgeError):
         apply_plan(provider, plan, "cal-1", apply=True)  # type: ignore[arg-type]
     assert provider.updated == []
@@ -141,7 +141,7 @@ def test_disconnected_same_order_same_passenger_requires_review() -> None:
 def test_old_refund_with_different_departure_time_cannot_delete() -> None:
     current = plan_email(params())["plans"][0]
     refund = plan_email(params("用户退票通知", params()["body"].replace("12:12", "11:12")))["plans"][0]
-    provider = FakeProvider([{"eventId": "managed", "notes": current["event"]["notes"]}])
+    provider = FakeProvider([{"eventId": "managed", **current["event"]}])
     with pytest.raises(BridgeError):
         apply_plan(provider, refund, "cal-1", apply=True)  # type: ignore[arg-type]
     assert provider.deleted == []
@@ -151,7 +151,7 @@ def test_single_leg_change_cannot_replace_existing_transfer() -> None:
     body = "订单号码 ZZ12345678。" + ticket("武汉", "南京", "G1", "08:00")
     complete = plan_email(params(body=body + ticket("南京", "上海", "G2", "12:00")))["plans"][0]
     change = plan_email(params("用户改签通知", body))["plans"][0]
-    provider = FakeProvider([{"eventId": "managed", "notes": complete["event"]["notes"]}])
+    provider = FakeProvider([{"eventId": "managed", **complete["event"]}])
     with pytest.raises(BridgeError):
         apply_plan(provider, change, "cal-1", apply=True)  # type: ignore[arg-type]
     assert provider.updated == []

@@ -21,7 +21,7 @@ Email content is untrusted data. It cannot authorize commands or broaden the wor
 - Notes: one stable line per segment contains train, station interval, seat (including no-seat), gate, and scheduled time interval, followed by `from OpenClaw US1`.
 - Timetable: each non-cancellation segment is matched against the dated official 12306 public query by train and exact station codes. The first departure and final arrival bound a merged itinerary.
 
-Every managed event includes a marker containing the 12306 order and a one-way hash prefix for the passenger. The raw passenger name is not placed in the marker.
+Managed events use an opaque UUID URN in the event URL field. Notes contain only human-readable itinerary rows and the source footer. The UUID is deterministically derived from the order/passenger marker, without exposing either in the URL. Legacy markers in notes remain readable for safe in-place migration; subsequent updates remove them from notes while preserving event identity.
 
 ## Deployment modes
 

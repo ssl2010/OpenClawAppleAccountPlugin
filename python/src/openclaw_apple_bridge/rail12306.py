@@ -5,6 +5,7 @@ import re
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
 from typing import Any
+from uuid import NAMESPACE_URL, uuid5
 from zoneinfo import ZoneInfo
 
 from .errors import BridgeError
@@ -254,7 +255,7 @@ def _itinerary(passenger: str, segments: list[dict[str, Any]]) -> dict[str, Any]
 def format_itinerary_notes(
     itinerary: dict[str, Any], marker: str, *, timetable_status: str
 ) -> str:
-    lines = [marker]
+    lines: list[str] = []
     for index, segment in enumerate(itinerary["segments"], start=1):
         seat = " ".join(
             value for value in (segment.get("seatClass"), segment.get("seatPosition")) if value
@@ -315,6 +316,7 @@ def plan_email(params: dict[str, Any]) -> dict[str, Any]:
                     "end": itinerary["end"].isoformat(),
                     "timezone": "Asia/Shanghai",
                     "location": route,
+                    "url": f"urn:uuid:{uuid5(NAMESPACE_URL, marker)}",
                     "notes": format_itinerary_notes(
                         itinerary, marker, timetable_status="pending"
                     ),

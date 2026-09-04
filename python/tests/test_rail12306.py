@@ -43,9 +43,9 @@ def test_transfer_segments_are_merged_and_destination_is_city() -> None:
     assert result["plans"][0]["segments"] == 3
     assert result["plans"][0]["event"]["title"] == "火车行程：武汉→上海"
     notes = result["plans"][0]["event"]["notes"].splitlines()
-    assert notes[1].startswith("1. G100｜武汉→南京南｜")
-    assert notes[2].startswith("2. G200｜南京南→苏州｜")
-    assert notes[3].startswith("3. G300｜苏州→上海虹桥｜")
+    assert notes[0].startswith("1. G100｜武汉→南京南｜")
+    assert notes[1].startswith("2. G200｜南京南→苏州｜")
+    assert notes[2].startswith("3. G300｜苏州→上海虹桥｜")
     assert notes[-1] == "from OpenClaw US1"
 
 
