@@ -68,7 +68,11 @@ Install the plugin and its model-facing skills with:
 openclaw plugins install --link ./dist/index.js --force --accept-capabilities
 openclaw skills install --global --force ./skills/apple-account
 openclaw skills install --global --force ./skills/rail12306-calendar
+openclaw skills install --global --force ./skills/mail-management
 ```
+
+Optional scheduled Gmail-to-Feishu briefings and separately approved recoverable
+cleanup are documented in [Mail management](docs/MAIL_MANAGEMENT.md).
 
 ## Credential policy
 

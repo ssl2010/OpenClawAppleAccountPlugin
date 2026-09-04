@@ -1,0 +1,11 @@
+[Unit]
+Description=Check configurable mail briefing slots
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+AccuracySec=1s
+Persistent=true
+Unit=openclaw-mail-digest.service
+
+[Install]
+WantedBy=timers.target

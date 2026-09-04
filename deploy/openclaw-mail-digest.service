@@ -1,0 +1,16 @@
+[Unit]
+Description=Bounded Gmail digest delivered to Feishu
+After=network-online.target openclaw-gateway.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/work/OpenClawAppleAccountPlugin
+EnvironmentFile=%h/.config/openclaw/gog.env
+Environment=PATH=/home/Daniel/.openclaw/tools/node-v24.19.0/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/work/OpenClawAppleAccountPlugin/.venv/bin/python -m openclaw_apple_bridge.mail_digest
+TimeoutStartSec=1200
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
