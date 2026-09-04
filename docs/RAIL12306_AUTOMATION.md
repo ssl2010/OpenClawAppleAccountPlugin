@@ -13,9 +13,10 @@ Email content is untrusted data. It cannot authorize commands or broaden the wor
 ## Semantics
 
 - Purchase: create the marked itinerary, or update the same marked itinerary idempotently.
-- Refund: delete only calendar items carrying the exact OpenClaw 12306 marker.
+- Refund: delete only an exact marked single-segment event whose train, stations and departure match. Partial/legacy refunds require review.
 - Change: update one exact marked itinerary. If reconciliation produces multiple candidates, stop with `CONFLICT`.
-- Transfers: connected segments for the same passenger within 24 hours are represented by one event from the first origin city to the final destination city. Individual trains remain in notes.
+- Transfers: connected segments in one notification/order for the same passenger within 24 hours are represented by one event. Cross-order merging and partial transfer changes require review; do not silently remove unrelated legs.
+- Fulfilled waitlists count as purchases. Waitlist withdrawals and invoice/reimbursement notices do not change calendars. Subjects, not policy footers, determine the transaction.
 - Stations: titles and locations use prefecture-level city aliases. Operator overrides are supported for unmapped stations.
 - Notes: one stable line per segment contains train, station interval, seat (including no-seat), gate, and scheduled time interval, followed by `from OpenClaw US1`.
 - Timetable: each non-cancellation segment is matched against the dated official 12306 public query by train and exact station codes. The first departure and final arrival bound a merged itinerary.
@@ -26,7 +27,19 @@ Every managed event includes a marker containing the 12306 order and a one-way h
 
 Run without `--apply` for dry-run validation. Production uses `--apply` only after purchase, refund, and change fixtures plus one real operator-approved round trip have passed.
 
-The worker stores only message ID, action, status, and safe error code in its `0600` state file. It does not store email bodies.
+The `0600` state stores message IDs, order IDs, original timestamps, action/status, notification flags and safe errors, not bodies. Per-order watermarks prevent stale purchases/retries from overwriting changes/refunds. A lock and write-ahead blocked state prevent crash replay. Unknown writes require reconciliation.
+
+Set `ICLOUD_CALENDAR_ID` explicitly to the railway calendar. Do not depend on calendar ordering. Forwarded mail with timezone-less Chinese timestamps requires explicit `RAIL12306_FORWARD_TIMEZONE=Asia/Shanghai`; ambiguous dates fail closed. Message search must return a complete bounded result with no omitted pages, otherwise no writes occur.
+
+Create/update success requires exact identity, content and time read-back. Delete requires confirmed absence; a detail 404 alone is insufficient, and must be corroborated by the readable calendar and original event-range listing.
+
+## 2026-09-04 regression validation
+
+- 103 Python tests passed; source mypy and ruff passed.
+- Private corpus: 54 attached EMLs. 29 purchase + 3 waitlist fulfillment + 3 refund + 6 change notices parsed; 11 invoices + 2 waitlist withdrawals excluded. All ticket dates predate the test cutoff. Raw samples are not committed.
+- Live temporary event create/update/delete completed with exact read-back and cleanup.
+- Target forwarded purchase passed the real CLI JSON boundary and updated the existing railway event in place; official dated timetable supplied the arrival.
+- `scripts/audit-rail-corpus.py ACCOUNT MESSAGE_ID` downloads EML only into a private temporary directory. `scripts/validate-rail-corpus.py CORPUS_JSON YYYY-MM-DD` performs read-only fixture checks. `scripts/rail-live-lifecycle.py --apply` requires explicit authorization for its temporary event lifecycle.
 
 ## Timetable failure behavior
 

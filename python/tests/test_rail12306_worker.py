@@ -21,15 +21,15 @@ class FakeProvider:
 
     def create_event(self, params: dict[str, Any]) -> dict[str, Any]:
         self.created.append(params)
-        return {"action": "created"}
+        return {"action": "created", "committed": True}
 
     def update_event(self, params: dict[str, Any]) -> dict[str, Any]:
         self.updated.append(params)
-        return {"action": "updated"}
+        return {"action": "updated", "committed": True}
 
     def delete_event(self, params: dict[str, Any]) -> dict[str, Any]:
         self.deleted.append(params)
-        return {"action": "deleted"}
+        return {"action": "deleted", "committed": True}
 
 
 class FakeTimetable:

@@ -39,7 +39,8 @@ def date_components(value: Any) -> datetime | None:
         try:
             parts = [int(part) for part in value]
             if len(parts) >= 7 and parts[0] > 9999:
-                parts = parts[1:]
+                # Apple's last component is minutes-from-midnight, NOT seconds.
+                parts = [*parts[1:6], 0]
             if len(parts) >= 6:
                 return datetime(
                     parts[0], parts[1], parts[2], parts[3], parts[4], parts[5], tzinfo=timezone

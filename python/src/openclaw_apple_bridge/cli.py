@@ -44,7 +44,15 @@ def main() -> None:
                 "retryable": False,
             },
         }
-    print(json.dumps(response, ensure_ascii=False, separators=(",", ":")))
+    try:
+        encoded = json.dumps(response, ensure_ascii=False, separators=(",", ":"))
+    except (TypeError, ValueError):
+        encoded = json.dumps({
+            "protocolVersion": 1, "requestId": response.get("requestId", ""), "ok": False,
+            "error": {"code": "INVALID_RESPONSE", "message": "Bridge response is not JSON-safe.",
+                      "retryable": False},
+        })
+    print(encoded)
 
 
 if __name__ == "__main__":

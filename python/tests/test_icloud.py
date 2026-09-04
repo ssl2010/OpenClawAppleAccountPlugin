@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
+import pytest
+from pyicloud.services.calendar import EventObject
+
+from openclaw_apple_bridge.errors import BridgeError
 from openclaw_apple_bridge.icloud import ICloudProvider
+from openclaw_apple_bridge.models import normalize_event, parse_rfc3339
 
 
 class FakeResponse:
@@ -32,6 +37,11 @@ class FakeCalendar:
 
     def get_ctag(self, _calendar_id: str) -> str:
         return "ctag-1"
+
+    def get_event_detail(self, _calendar: str, _event: str, *, as_obj: bool) -> dict[str, Any]:
+        assert not as_obj
+        assert self.session.last_json
+        return self.session.last_json["Event"]
 
     def get_calendars(self, *, as_objs: bool) -> list[dict[str, Any]]:
         assert not as_objs
@@ -87,3 +97,127 @@ def test_create_preserves_notes_and_url(monkeypatch: Any, tmp_path: Any) -> None
         }
     )
     assert result["committed"] is True
+
+
+def test_real_pyicloud_date_arrays_are_minutes_not_seconds() -> None:
+    event = EventObject(
+        pguid="cal-1", start_date=parse_rfc3339("2026-09-08T12:12:00+08:00"),
+        end_date=parse_rfc3339("2026-09-08T14:00:00+08:00"),
+    )
+    actual = normalize_event(event.request_data["Event"])
+    assert actual["start"] == "2026-09-08T12:12:00+08:00"
+    assert actual["end"] == "2026-09-08T14:00:00+08:00"
+
+
+@pytest.mark.parametrize("response", [{"status": "pending"}, {"Event": [{}]}, {}])
+def test_response_alone_never_proves_commit(response: dict[str, Any]) -> None:
+    with pytest.raises(BridgeError, match="read-back reconciliation"):
+        ICloudProvider._mutation_result("created", EventObject(pguid="cal-1"), response)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("guid", "other"), ("pGuid", "other"), ("description", "lost notes"),
+    ("title", "different"), ("location", "different"), ("url", "different"),
+    ("allDay", True), ("localStartDate", [20260908, 2026, 9, 8, 13, 0, 780]),
+    ("localEndDate", [20260908, 2026, 9, 8, 15, 0, 600]),
+])
+def test_stale_or_mismatched_readback_is_unknown(field: str, value: Any) -> None:
+    event = EventObject(
+        pguid="cal-1", start_date=parse_rfc3339("2026-09-08T12:12:00+08:00"),
+        end_date=parse_rfc3339("2026-09-08T14:00:00+08:00"),
+    )
+    calendar = FakeCalendar()
+    calendar.session.last_json = event.request_data
+    calendar.session.last_json["Event"][field] = value
+    with pytest.raises(BridgeError, match="read-back reconciliation"):
+        ICloudProvider._mutation_result("updated", event, {"ok": True}, calendar, {})
+
+
+def test_identity_mismatch_refuses_before_write() -> None:
+    with pytest.raises(BridgeError, match="different calendar event"):
+        ICloudProvider._assert_identity(
+            {"calendarId": "c", "eventId": "wrong"}, {"calendarId": "c", "eventId": "e"}
+        )
+
+
+@pytest.mark.parametrize("reply,success", [
+    ({"Event": []}, True), ({}, False), ({"status": "pending"}, False),
+    ({"Event": [{}]}, False), ({"Event": [], "serviceErrors": ["denied"]}, False),
+])
+def test_delete_requires_exact_resource_absence(reply: dict[str, Any], success: bool) -> None:
+    from types import SimpleNamespace
+
+    class ReadResponse(FakeResponse):
+        def raise_for_status(self) -> None:
+            pass
+
+    event = EventObject(pguid="cal-1", guid="event-1")
+
+    def get(url: str, *, params: dict[str, Any]) -> ReadResponse:
+        assert url == "https://example.invalid/detail/cal-1/event-1"
+        assert params["dsid"] == "test"
+        return ReadResponse(reply)
+
+    calendar = SimpleNamespace(
+        params={}, _calendar_event_detail_url="https://example.invalid/detail",
+        session=SimpleNamespace(
+            get=get, service=SimpleNamespace(data={"dsInfo": {"dsid": "test"}})
+        ),
+    )
+    if success:
+        assert ICloudProvider._mutation_result(
+            "deleted", event, {"ack": True}, calendar, {}
+        )["committed"] is True
+    else:
+        with pytest.raises(BridgeError, match="read-back reconciliation"):
+            ICloudProvider._mutation_result("deleted", event, {"ack": True}, calendar, {})
+
+
+@pytest.mark.parametrize("code,reason,collections,events,success", [
+    (404, "Not Found", [{"guid": "cal-1"}], [], True),
+    (403, "Not Authorized", [{"guid": "cal-1"}], [], False),
+    (401, "Not Found", [{"guid": "cal-1"}], [], False),
+    (404, "Not Authorized", [{"guid": "cal-1"}], [], False),
+    (404, "Not Found", [{"guid": "wrong-calendar"}], [], False),
+    (404, "Not Found", [], [], False),
+    (404, "Not Found", [{"guid": "cal-1"}], [{"guid": "event-1", "pGuid": "cal-1"}], False),
+    (404, "Not Found", [{"guid": "cal-1"}], [{}], False),
+    (404, "Not Found", [{"guid": "cal-1"}], None, False),
+])
+def test_delete_404_needs_readable_same_calendar_and_absent_guid(
+    code: int, reason: str, collections: Any, events: Any, success: bool,
+) -> None:
+    from types import SimpleNamespace
+
+    from pyicloud.exceptions import PyiCloudAPIResponseException
+
+    event = EventObject(
+        pguid="cal-1", guid="event-1",
+        start_date=parse_rfc3339("2026-09-08T12:12:00+08:00"),
+        end_date=parse_rfc3339("2026-09-08T14:00:00+08:00"),
+    )
+
+    def get(url: str, *, params: dict[str, Any]) -> None:
+        assert url == "https://example.invalid/detail/cal-1/event-1"
+        raise PyiCloudAPIResponseException(reason, code)
+
+    def get_events(start: Any, end: Any, *, as_objs: bool) -> Any:
+        assert start.isoformat() == "2026-09-07T12:12:00+08:00"
+        assert end.isoformat() == "2026-09-09T14:00:00+08:00"
+        assert not as_objs
+        return events
+
+    calendar = SimpleNamespace(
+        params={}, _calendar_event_detail_url="https://example.invalid/detail",
+        session=SimpleNamespace(
+            get=get, service=SimpleNamespace(data={"dsInfo": {"dsid": "test"}})
+        ),
+        get_calendars=lambda **kwargs: collections, get_events=get_events,
+    )
+    if success:
+        assert ICloudProvider._mutation_result(
+            "deleted", event, {"ack": True}, calendar, {}
+        )["committed"] is True
+    else:
+        with pytest.raises(BridgeError, match="read-back reconciliation"):
+            ICloudProvider._mutation_result("deleted", event, {"ack": True}, calendar, {})

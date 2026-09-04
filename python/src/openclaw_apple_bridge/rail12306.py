@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 from datetime import datetime, timedelta
+from html.parser import HTMLParser
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -77,6 +78,38 @@ TICKET_RE = re.compile(
 ORDER_RE = re.compile(r"订单(?:号码|号)?\s*[:：]?\s*([A-Z0-9]{8,20})", re.IGNORECASE)
 
 
+class _MailText(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self.hidden = 0
+
+    def handle_starttag(self, tag: str, attrs: Any) -> None:
+        if tag in {"script", "style"}:
+            self.hidden += 1
+        if tag in {"br", "p", "div", "tr", "li"}:
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in {"script", "style"}:
+            self.hidden = max(0, self.hidden - 1)
+        if tag in {"p", "div", "tr", "li"}:
+            self.parts.append("\n")
+
+    def handle_data(self, data: str) -> None:
+        if not self.hidden:
+            self.parts.append(data)
+
+
+def email_text(body: str) -> str:
+    body = unwrap_external(body)
+    if re.search(r"<(?:html|body|div|p|table|br)\b", body, re.IGNORECASE):
+        parser = _MailText()
+        parser.feed(body)
+        body = "".join(parser.parts)
+    return body.replace("\xa0", " ")
+
+
 def station_city(station: str, aliases: dict[str, str] | None = None) -> str:
     value = re.sub(r"(?:火车)?站$", "", station.strip())
     merged = {**CITY_ALIASES, **(aliases or {})}
@@ -89,14 +122,33 @@ def station_city(station: str, aliases: dict[str, str] | None = None) -> str:
 
 
 def classify_mail(subject: str, body: str) -> str:
-    text = f"{subject}\n{body}"
-    if re.search(r"退票|退款.*成功|已退", text):
-        return "cancel"
-    if re.search(r"改签|变更到站", text):
-        return "change"
-    if re.search(r"购票|支付通知|成功购买|车票", text):
-        return "book"
+    # Only an explicit notification subject defines the operation. Footer policy,
+    # quoted history and conditional text must never authorize a deletion.
+    text = unwrap_external(subject).strip()
+    if re.search(r"失败|申请|须知|说明|规则|提醒|未成功|待支付|取消订单|发票|报销|凭证|候补订单退单|12306历史邮件|OpenClaw测试", text):
+        raise BridgeError("UNSUPPORTED_EMAIL", "Not a confirmed ticket transaction notice.")
+    actions = set()
+    if re.search(r"退票(?:成功|通知)|退款成功|用户退票", text):
+        actions.add("cancel")
+    if re.search(r"改签(?:成功|通知)|变更到站(?:成功|通知)|用户改签", text):
+        actions.add("change")
+    if re.search(r"支付通知|购票成功|成功购买|出票成功|候补订单兑现成功通知", text):
+        actions.add("book")
+    if len(actions) == 1:
+        return actions.pop()
+    if len(actions) > 1:
+        raise BridgeError("CONFLICT", "The notification subject has conflicting operations.")
     raise BridgeError("UNSUPPORTED_EMAIL", "The email is not a recognized 12306 itinerary notice.")
+
+
+def unwrap_external(value: str) -> str:
+    """Remove gog's transport wrapper, not arbitrary text inside the email."""
+    match = re.fullmatch(
+        r'<<<EXTERNAL_UNTRUSTED_CONTENT id="([^"]+)">>>\nSource: [^\n]+\n---\n'
+        r'(.*)\n<<<END_EXTERNAL_UNTRUSTED_CONTENT id="\1">>>',
+        value.strip(), re.DOTALL,
+    )
+    return match.group(2) if match else value
 
 
 def parse_ticket_details(details: str) -> dict[str, str]:
@@ -125,14 +177,13 @@ def parse_segments(body: str, aliases: dict[str, str] | None = None) -> list[dic
     timezone = ZoneInfo("Asia/Shanghai")
     for match in TICKET_RE.finditer(body):
         raw = match.groupdict()
-        departure = datetime(
-            int(raw["year"]),
-            int(raw["month"]),
-            int(raw["day"]),
-            int(raw["hour"]),
-            int(raw["minute"]),
-            tzinfo=timezone,
-        )
+        try:
+            departure = datetime(
+                int(raw["year"]), int(raw["month"]), int(raw["day"]),
+                int(raw["hour"]), int(raw["minute"]), tzinfo=timezone,
+            )
+        except ValueError as exc:
+            raise BridgeError("PARSE_FAILED", "The ticket date or time is invalid.") from exc
         origin_station = raw["origin"].removesuffix("站")
         destination_station = raw["destination"].removesuffix("站")
         details = parse_ticket_details(raw.get("details") or "")
@@ -148,7 +199,17 @@ def parse_segments(body: str, aliases: dict[str, str] | None = None) -> list[dic
                 **details,
             }
         )
-    return segments
+    if len(re.findall(r"20\d{2}年\d{1,2}月\d{1,2}日[^\n。]*?开", body)) > len(segments):
+        raise BridgeError("PARSE_FAILED", "At least one ticket segment could not be parsed.")
+    unique: dict[tuple[Any, ...], dict[str, Any]] = {}
+    for segment in segments:
+        key = tuple(segment[field] for field in (
+            "passenger", "departure", "originStation", "destinationStation", "train"
+        ))
+        if key in unique and unique[key] != segment:
+            raise BridgeError("CONFLICT", "Conflicting copies of a ticket were found.")
+        unique[key] = segment
+    return list(unique.values())
 
 
 def merge_segments(segments: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -222,13 +283,20 @@ def plan_email(params: dict[str, Any]) -> dict[str, Any]:
     if not message_id or not body or len(body) > 200_000:
         raise BridgeError("INVALID_REQUEST", "messageId and a bounded email body are required.")
     action = classify_mail(subject, body)
+    body = email_text(body)
     segments = parse_segments(body, params.get("stationCityAliases"))
     if not segments:
         raise BridgeError("PARSE_FAILED", "No complete 12306 ticket segment was found.")
-    order_match = ORDER_RE.search(body)
-    order_id = order_match.group(1).upper() if order_match else "unknown"
+    orders = {match.group(1).upper() for match in ORDER_RE.finditer(body)}
+    if len(orders) != 1:
+        raise BridgeError("PARSE_FAILED", "Exactly one unambiguous order ID is required.")
+    order_id = orders.pop()
     plans: list[dict[str, Any]] = []
-    for itinerary in merge_segments(segments):
+    itineraries = merge_segments(segments)
+    passengers = [item["passenger"] for item in itineraries]
+    if len(passengers) != len(set(passengers)):
+        raise BridgeError("CONFLICT", "Disconnected journeys in one order require review.")
+    for itinerary in itineraries:
         passenger_key = hashlib.sha256(itinerary["passenger"].encode()).hexdigest()[:12]
         marker = f"[OpenClaw:12306 order={order_id} passenger={passenger_key}]"
         route = f"{itinerary['originCity']}→{itinerary['destinationCity']}"
@@ -252,7 +320,10 @@ def plan_email(params: dict[str, Any]) -> dict[str, Any]:
                     ),
                 },
                 "segments": len(itinerary["segments"]),
-                "segmentDetails": itinerary["segments"],
+                "segmentDetails": [
+                    {**segment, "departure": segment["departure"].isoformat()}
+                    for segment in itinerary["segments"]
+                ],
                 "timetableStatus": "pending",
             }
         )

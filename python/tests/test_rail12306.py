@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from openclaw_apple_bridge.models import parse_rfc3339
 from openclaw_apple_bridge.rail12306 import plan_email, station_city
 
 
@@ -25,7 +26,7 @@ def test_purchase_parsing() -> None:
     assert segment["seatPosition"] == "9车10F号"
     assert segment["gate"] == "A5"
     assert result["plans"][0]["event"]["end"] == (
-        segment["departure"] + timedelta(minutes=10)
+        parse_rfc3339(segment["departure"]) + timedelta(minutes=10)
     ).isoformat()
     assert result["plans"][0]["event"]["notes"].splitlines()[-1] == "from OpenClaw US1"
 
