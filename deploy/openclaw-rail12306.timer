@@ -2,8 +2,7 @@
 Description=Check Gmail for new 12306 itinerary notices
 
 [Timer]
-OnBootSec=5min
-OnUnitActiveSec=10min
+OnCalendar=*:0/10
 RandomizedDelaySec=60
 Persistent=true
 Unit=openclaw-rail12306.service

@@ -38,6 +38,7 @@ Create/update success requires exact identity, content and time read-back. Delet
 - 103 Python tests passed; source mypy and ruff passed.
 - Private corpus: 54 attached EMLs. 29 purchase + 3 waitlist fulfillment + 3 refund + 6 change notices parsed; 11 invoices + 2 waitlist withdrawals excluded. All ticket dates predate the test cutoff. Raw samples are not committed.
 - Live temporary event create/update/delete completed with exact read-back and cleanup.
+- Plugin build and 2 TypeScript tests passed. The timer uses a persistent ten-minute wall-clock schedule; after reload verify a real next execution time (an active but elapsed monotonic timer is not sufficient).
 - Target forwarded purchase passed the real CLI JSON boundary and updated the existing railway event in place; official dated timetable supplied the arrival.
 - `scripts/audit-rail-corpus.py ACCOUNT MESSAGE_ID` downloads EML only into a private temporary directory. `scripts/validate-rail-corpus.py CORPUS_JSON YYYY-MM-DD` performs read-only fixture checks. `scripts/rail-live-lifecycle.py --apply` requires explicit authorization for its temporary event lifecycle.
 
