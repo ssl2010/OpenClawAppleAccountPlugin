@@ -15,6 +15,14 @@ This is server-side OpenClaw work, not a Codex-desktop reminder. The Mac need no
 ## Configuration
 
 Private config: `~/.config/openclaw-mail-management/config.json`, mode 0600.
+Start from `deploy/mail-management.config.example.json`; replace every placeholder.
+The reusable summarizer instructions are in `deploy/mail-brief/AGENTS.md`.
+Create a dedicated `mail-brief` agent/workspace using the installed OpenClaw CLI,
+copy those instructions to its workspace, and configure its tools with profile
+`minimal`, allow only `session_status`, and deny runtime, filesystem, web,
+messaging and Apple-account tools. Set its skills list empty. Select a working
+provider/model already authorized on the host. Verify its actual runtime tools
+before enabling the timer: prompt instructions alone are not a security boundary.
 
 - `account`: exact aggregator Gmail account; upstream source mailboxes are never mutated.
 - `timezone`: Asia/Shanghai initially.

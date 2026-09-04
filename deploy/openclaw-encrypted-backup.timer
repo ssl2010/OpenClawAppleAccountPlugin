@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily US1 encrypted backup at 03:30 China time
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 Asia/Shanghai
+Persistent=true
+AccuracySec=1min
+Unit=openclaw-encrypted-backup.service
+
+[Install]
+WantedBy=timers.target

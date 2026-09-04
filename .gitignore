@@ -17,3 +17,7 @@ credentials/
 sessions/
 cookies/
 *.session
+*.age
+*.age.sha256
+*identity.txt
+backups/

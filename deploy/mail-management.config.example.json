@@ -1,0 +1,18 @@
+{
+  "account": "owner@example.com",
+  "timezone": "Asia/Shanghai",
+  "times": ["08:30", "11:30", "14:30", "17:30", "21:30"],
+  "sources": {
+    "personal@example.com": "MSN邮箱",
+    "university@example.edu": "武大邮箱",
+    "work@example.org": "公司邮箱",
+    "google@example.com": "谷歌邮箱"
+  },
+  "agent": "mail-brief",
+  "feishuTarget": "REPLACE_WITH_APPROVED_FEISHU_TARGET",
+  "maxMessages": 500,
+  "holidays": [],
+  "extraWorkdays": [],
+  "cleanup": {"enabled": false, "approved": false, "scope": "inbox", "maxDelete": 100},
+  "stateFile": "/home/USER/.local/state/openclaw-mail-management/state.json"
+}

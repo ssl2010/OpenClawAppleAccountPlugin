@@ -1,0 +1,12 @@
+[Unit]
+Description=US1 encrypted OpenClaw backup (seven-day retention)
+After=network-online.target
+
+[Service]
+Type=oneshot
+Environment=PATH=/home/Daniel/.openclaw/tools/node-v24.19.0/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/python3 %h/work/OpenClawAppleAccountPlugin/scripts/encrypted-backup.py
+TimeoutStartSec=2400
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
