@@ -83,3 +83,16 @@ Tests cover all source mappings, local/body-spoof cases, ambiguous headers, day/
 boundaries, workday overrides, full pagination, overflow/loop refusal, excluded folders,
 empty/large digests, degraded summary, delivery fencing, cleanup approval/limits and
 no repeat after successful delivery.
+
+## Deployment validation (2026-09-04)
+
+136 Python tests passed (30 mail-management tests); ruff, source mypy and skill
+validation passed. A real forwarded university message was correctly attributed and
+summarized with its stated deadline. Both a labeled test briefing and the initial
+live catch-up briefing received confirmed Feishu receipts. Repeated minute checks
+returned already-sent without duplicate live delivery. The summary agent's actual
+runtime tool inventory contained only session_status. Other source mappings were
+verified with synthetic headers, not claims of accessing those upstream accounts.
+
+Cleanup remains disabled pending explicit confirmation of folder/workday scope.
+No business mail was deleted during this feature's validation.
