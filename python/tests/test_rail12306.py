@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from openclaw_apple_bridge.rail12306 import plan_email, station_city
 
 
@@ -12,12 +14,20 @@ def test_purchase_parsing() -> None:
         {
             "messageId": "mail-1",
             "subject": "网上购票系统-用户支付通知",
-            "body": "订单号码 AB12345678。1.测试旅客，2026年09月08日12:12开，武汉站-深圳北站，G395次列车。",
+            "body": "订单号码 AB12345678。1.测试旅客，2026年09月08日12:12开，武汉站-深圳北站，G395次，9车10F号，二等座，成人票，检票口A5，电子客票。",
         }
     )
     assert result["mailAction"] == "book"
     assert result["plans"][0]["operation"] == "upsert"
     assert result["plans"][0]["event"]["title"] == "火车行程：武汉→深圳"
+    segment = result["plans"][0]["segmentDetails"][0]
+    assert segment["seatClass"] == "二等座"
+    assert segment["seatPosition"] == "9车10F号"
+    assert segment["gate"] == "A5"
+    assert result["plans"][0]["event"]["end"] == (
+        segment["departure"] + timedelta(minutes=10)
+    ).isoformat()
+    assert result["plans"][0]["event"]["notes"].splitlines()[-1] == "from OpenClaw US1"
 
 
 def test_transfer_segments_are_merged_and_destination_is_city() -> None:
@@ -31,6 +41,22 @@ def test_transfer_segments_are_merged_and_destination_is_city() -> None:
     assert len(result["plans"]) == 1
     assert result["plans"][0]["segments"] == 3
     assert result["plans"][0]["event"]["title"] == "火车行程：武汉→上海"
+    notes = result["plans"][0]["event"]["notes"].splitlines()
+    assert notes[1].startswith("1. G100｜武汉→南京南｜")
+    assert notes[2].startswith("2. G200｜南京南→苏州｜")
+    assert notes[3].startswith("3. G300｜苏州→上海虹桥｜")
+    assert notes[-1] == "from OpenClaw US1"
+
+
+def test_no_seat_is_preserved() -> None:
+    result = plan_email(
+        {
+            "messageId": "mail-no-seat",
+            "subject": "购票成功",
+            "body": "订单号码 NS12345678。测试旅客，2026年09月08日12:12开，武汉站-深圳北站，G395次，9车无座，成人票。",
+        }
+    )
+    assert "9车无座" in result["plans"][0]["event"]["notes"]
 
 
 def test_refund_creates_delete_plan() -> None:

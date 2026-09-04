@@ -72,7 +72,7 @@ TICKET_RE = re.compile(
     r"(?P<hour>\d{1,2}):(?P<minute>\d{2})开[，,]\s*"
     r"(?P<origin>[\u4e00-\u9fffA-Za-z0-9]+?)站?\s*[-—至到>]\s*"
     r"(?P<destination>[\u4e00-\u9fffA-Za-z0-9]+?)站?[，,]\s*"
-    r"(?P<train>[A-Z]?[0-9]{1,5})次"
+    r"(?P<train>[A-Z]?[0-9]{1,5})次(?P<details>[^。\r\n]*)"
 )
 ORDER_RE = re.compile(r"订单(?:号码|号)?\s*[:：]?\s*([A-Z0-9]{8,20})", re.IGNORECASE)
 
@@ -99,6 +99,27 @@ def classify_mail(subject: str, body: str) -> str:
     raise BridgeError("UNSUPPORTED_EMAIL", "The email is not a recognized 12306 itinerary notice.")
 
 
+def parse_ticket_details(details: str) -> dict[str, str]:
+    tokens = [item.strip(" ，,") for item in re.split(r"[，,]", details) if item.strip(" ，,")]
+    position = next(
+        (item for item in tokens if re.fullmatch(r"\d{1,2}车(?:[A-Z0-9]+号|无座)", item)),
+        "",
+    )
+    seat_class = next(
+        (
+            item
+            for item in tokens
+            if re.fullmatch(r"(?:商务座|特等座|优选一等座|一等座|二等座|软卧|硬卧|动卧|软座|硬座|无座)", item)
+        ),
+        "",
+    )
+    gate_token = next((item for item in tokens if item.startswith("检票口")), "")
+    gate = gate_token.removeprefix("检票口").strip()
+    if seat_class == "无座" and not position:
+        position = "无座"
+    return {"seatClass": seat_class, "seatPosition": position, "gate": gate}
+
+
 def parse_segments(body: str, aliases: dict[str, str] | None = None) -> list[dict[str, Any]]:
     segments: list[dict[str, Any]] = []
     timezone = ZoneInfo("Asia/Shanghai")
@@ -114,6 +135,7 @@ def parse_segments(body: str, aliases: dict[str, str] | None = None) -> list[dic
         )
         origin_station = raw["origin"].removesuffix("站")
         destination_station = raw["destination"].removesuffix("站")
+        details = parse_ticket_details(raw.get("details") or "")
         segments.append(
             {
                 "passenger": raw["passenger"],
@@ -123,6 +145,7 @@ def parse_segments(body: str, aliases: dict[str, str] | None = None) -> list[dic
                 "originCity": station_city(origin_station, aliases),
                 "destinationCity": station_city(destination_station, aliases),
                 "train": raw["train"].upper(),
+                **details,
             }
         )
     return segments
@@ -162,9 +185,34 @@ def _itinerary(passenger: str, segments: list[dict[str, Any]]) -> dict[str, Any]
         "originCity": first["originCity"],
         "destinationCity": last["destinationCity"],
         "start": first["departure"],
-        "end": last["departure"] + timedelta(hours=2),
+        "end": last["departure"] + timedelta(minutes=10),
         "segments": segments,
     }
+
+
+def format_itinerary_notes(
+    itinerary: dict[str, Any], marker: str, *, timetable_status: str
+) -> str:
+    lines = [marker]
+    for index, segment in enumerate(itinerary["segments"], start=1):
+        seat = " ".join(
+            value for value in (segment.get("seatClass"), segment.get("seatPosition")) if value
+        ) or "座位待定"
+        gate = segment.get("gate") or "待定"
+        departure = segment["departure"]
+        arrival = segment.get("arrival") or departure + timedelta(minutes=10)
+        time_range = (
+            f"{departure.strftime('%Y-%m-%d %H:%M')}–"
+            f"{arrival.strftime('%Y-%m-%d %H:%M')}"
+        )
+        if timetable_status != "resolved":
+            time_range += "（时刻表待补充）"
+        lines.append(
+            f"{index}. {segment['train']}｜{segment['originStation']}→"
+            f"{segment['destinationStation']}｜{seat}｜检票口 {gate}｜{time_range}"
+        )
+    lines.append("from OpenClaw US1")
+    return "\n".join(lines)
 
 
 def plan_email(params: dict[str, Any]) -> dict[str, Any]:
@@ -184,10 +232,6 @@ def plan_email(params: dict[str, Any]) -> dict[str, Any]:
         passenger_key = hashlib.sha256(itinerary["passenger"].encode()).hexdigest()[:12]
         marker = f"[OpenClaw:12306 order={order_id} passenger={passenger_key}]"
         route = f"{itinerary['originCity']}→{itinerary['destinationCity']}"
-        detail_lines = [
-            f"{segment['train']} {segment['originStation']}→{segment['destinationStation']} {segment['departure'].strftime('%Y-%m-%d %H:%M')}"
-            for segment in itinerary["segments"]
-        ]
         operation = (
             "delete"
             if action == "cancel"
@@ -203,9 +247,13 @@ def plan_email(params: dict[str, Any]) -> dict[str, Any]:
                     "end": itinerary["end"].isoformat(),
                     "timezone": "Asia/Shanghai",
                     "location": route,
-                    "notes": "\n".join([marker, f"来源邮件: {message_id}", *detail_lines]),
+                    "notes": format_itinerary_notes(
+                        itinerary, marker, timetable_status="pending"
+                    ),
                 },
                 "segments": len(itinerary["segments"]),
+                "segmentDetails": itinerary["segments"],
+                "timetableStatus": "pending",
             }
         )
     return {

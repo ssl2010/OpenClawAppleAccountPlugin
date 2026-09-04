@@ -5,6 +5,7 @@ from typing import Any
 from .errors import BridgeError, classify_exception
 from .icloud import ICloudProvider
 from .rail12306 import plan_email
+from .timetable import RailwayTimetable
 
 
 def dispatch(
@@ -19,6 +20,12 @@ def dispatch(
             raise BridgeError("INVALID_REQUEST", "params must be an object.")
         if operation == "rail12306.plan":
             data = plan_email(params)
+        elif operation == "rail12306.timetable":
+            data = RailwayTimetable(
+                timeout_seconds=float(
+                    (request.get("config") or {}).get("requestTimeoutSeconds", 20)
+                )
+            ).lookup(params)
         else:
             provider = provider_factory(request.get("config") or {})
             handlers = {

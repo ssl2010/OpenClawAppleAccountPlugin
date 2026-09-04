@@ -15,6 +15,7 @@ describe("apple-account plugin metadata", () => {
     expect(names).toContain("apple_calendar_create_event");
     expect(names).toContain("apple_calendar_delete_event");
     expect(names).toContain("apple_rail12306_plan_email");
+    expect(names).toContain("rail12306_lookup_timetable");
     expect(metadata?.tools.find((item) => item.name === "apple_calendar_delete_event")?.optional).toBe(true);
   });
 });

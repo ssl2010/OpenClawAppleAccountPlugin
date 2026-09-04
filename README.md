@@ -38,7 +38,7 @@ openclaw.plugin.json         OpenClaw manifest
 ## Current implementation
 
 The plugin registers account status, calendar list/get/query/create/update/delete,
-and deterministic 12306 email-planning tools. A restricted systemd worker checks
+deterministic 12306 email-planning tools, and an official timetable lookup tool. A restricted systemd worker checks
 trusted 12306 Gmail notices every ten minutes and applies idempotent Calendar
 changes. The accompanying skills describe interactive safety and rail-email
 semantics. Reminders and Notes remain future capabilities and are not advertised.

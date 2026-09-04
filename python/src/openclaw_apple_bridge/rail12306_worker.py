@@ -12,7 +12,8 @@ from typing import Any
 from .errors import BridgeError
 from .icloud import ICloudProvider
 from .models import parse_rfc3339
-from .rail12306 import plan_email
+from .rail12306 import format_itinerary_notes, plan_email
+from .timetable import RailwayTimetable
 
 
 def _gog_json(args: list[str]) -> Any:
@@ -108,7 +109,11 @@ def apply_plan(
 
 
 def process_message(
-    message: dict[str, Any], provider: ICloudProvider, *, apply: bool
+    message: dict[str, Any],
+    provider: ICloudProvider,
+    *,
+    apply: bool,
+    timetable: RailwayTimetable | None = None,
 ) -> dict[str, Any]:
     message_id = str((message.get("message") or {}).get("id") or message.get("id") or "")
     if not message_id or not _trusted_message(message):
@@ -122,9 +127,108 @@ def process_message(
             "body": str(message.get("body") or ""),
         }
     )
+    timetable_failures: list[dict[str, str]] = []
+    if plan["mailAction"] != "cancel":
+        resolver = timetable or RailwayTimetable(
+            timeout_seconds=float(os.environ.get("RAIL12306_TIMEOUT_SECONDS", "20"))
+        )
+        for item in plan["plans"]:
+            segment_details = item["segmentDetails"]
+            for segment in segment_details:
+                try:
+                    result = resolver.lookup(
+                        {
+                            "travelDate": segment["departure"].strftime("%Y-%m-%d"),
+                            "trainNumber": segment["train"],
+                            "originStation": segment["originStation"],
+                            "destinationStation": segment["destinationStation"],
+                        }
+                    )
+                    official_departure = parse_rfc3339(result["departure"])
+                    if abs((official_departure - segment["departure"]).total_seconds()) > 1800:
+                        raise BridgeError(
+                            "TIMETABLE_MISMATCH",
+                            "The official departure differs from the ticket notice.",
+                        )
+                    segment["arrival"] = parse_rfc3339(result["arrival"])
+                except BridgeError as exc:
+                    timetable_failures.append(
+                        {
+                            "train": segment["train"],
+                            "route": (
+                                f"{segment['originStation']}→{segment['destinationStation']}"
+                            ),
+                            "error": exc.code,
+                        }
+                    )
+            failed_trains = {failure["train"] for failure in timetable_failures}
+            item["timetableStatus"] = (
+                "fallback" if any(x["train"] in failed_trains for x in segment_details) else "resolved"
+            )
+            last = segment_details[-1]
+            item["event"]["end"] = (
+                last.get("arrival") or last["departure"] + timedelta(minutes=10)
+            ).isoformat()
+            itinerary = {"segments": segment_details}
+            item["event"]["notes"] = format_itinerary_notes(
+                itinerary, item["lookup"]["marker"], timetable_status=item["timetableStatus"]
+            )
     calendar_id = _calendar_id(provider)
     outcomes = [apply_plan(provider, item, calendar_id, apply=apply) for item in plan["plans"]]
-    return {"messageId": message_id, "mailAction": plan["mailAction"], "outcomes": outcomes}
+    return {
+        "messageId": message_id,
+        "mailAction": plan["mailAction"],
+        "outcomes": outcomes,
+        "timetableFailures": timetable_failures,
+    }
+
+
+def _notify_timetable_failure(failures: list[dict[str, str]]) -> bool:
+    target = os.environ.get("RAIL12306_FEISHU_TARGET", "").strip()
+    executable = str(
+        Path(os.environ.get("OPENCLAW_PATH", "~/.openclaw/bin/openclaw")).expanduser()
+    )
+    if not target:
+        try:
+            configured = subprocess.run(
+                [executable, "config", "get", "channels.feishu.allowFrom", "--json"],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            allowed = json.loads(configured.stdout)
+            target = str(allowed[0]).strip() if allowed else ""
+        except (OSError, subprocess.SubprocessError, json.JSONDecodeError, IndexError, TypeError):
+            return False
+    if not target:
+        return False
+    details = "；".join(f"{item['train']} {item['route']}" for item in failures[:5])
+    message = (
+        "⚠️ 12306 官方时刻表查询失败："
+        f"{details}。日历暂按发车后 10 分钟结束；系统会每 10 分钟重试，成功后自动更新。"
+    )
+    try:
+        subprocess.run(
+            [
+                executable,
+                "message",
+                "send",
+                "--channel",
+                "feishu",
+                "--target",
+                target,
+                "--message",
+                message,
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        return True
+    except (OSError, subprocess.SubprocessError):
+        return False
 
 
 def _load_state(path: Path) -> dict[str, Any]:
@@ -162,11 +266,22 @@ def run(*, apply: bool, max_messages: int = 20) -> dict[str, Any]:
         message_id = str(summary.get("id") or "")
         if not message_id or state["messages"].get(message_id, {}).get("status") == "applied":
             continue
+        previous = state["messages"].get(message_id, {})
         try:
             message = _gog_json(["gmail", "get", message_id])
             outcome = process_message(message, provider, apply=apply)
-            status = "applied" if apply else "dry-run"
-            state["messages"][message_id] = {"status": status, "mailAction": outcome["mailAction"]}
+            failures = outcome["timetableFailures"]
+            status = "applied" if apply and not failures else (
+                "timetable-pending" if apply else "dry-run"
+            )
+            notified = bool(previous.get("timetableFailureNotified"))
+            if apply and failures and not notified:
+                notified = _notify_timetable_failure(failures)
+            state["messages"][message_id] = {
+                "status": status,
+                "mailAction": outcome["mailAction"],
+                "timetableFailureNotified": notified,
+            }
             outcomes.append(outcome)
         except BridgeError as exc:
             state["messages"][message_id] = {

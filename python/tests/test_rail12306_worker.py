@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from openclaw_apple_bridge.errors import BridgeError
 from openclaw_apple_bridge.rail12306_worker import apply_plan, process_message
 
 
@@ -31,6 +32,20 @@ class FakeProvider:
         return {"action": "deleted"}
 
 
+class FakeTimetable:
+    def lookup(self, params: dict[str, Any]) -> dict[str, Any]:
+        return {
+            **params,
+            "departure": "2026-09-08T12:12:00+08:00",
+            "arrival": "2026-09-08T17:45:00+08:00",
+        }
+
+
+class FailingTimetable:
+    def lookup(self, _params: dict[str, Any]) -> dict[str, Any]:
+        raise BridgeError("TIMETABLE_UNAVAILABLE", "test failure", retryable=True)
+
+
 def purchase_message() -> dict[str, Any]:
     return {
         "body": '发件人:"12306@rails.com.cn" <12306@rails.com.cn>\n订单号码 AB12345678。测试旅客，2026年09月08日12:12开，武汉站-深圳北站，G395次列车。',
@@ -44,8 +59,24 @@ def purchase_message() -> dict[str, Any]:
 
 def test_process_message_dry_run(monkeypatch: Any) -> None:
     monkeypatch.setenv("RAIL12306_TRUSTED_FORWARDERS", "trusted@example.com")
-    result = process_message(purchase_message(), FakeProvider(), apply=False)  # type: ignore[arg-type]
+    result = process_message(
+        purchase_message(), FakeProvider(), apply=False, timetable=FakeTimetable()  # type: ignore[arg-type]
+    )
     assert result["outcomes"] == [{"action": "would-create"}]
+    assert result["timetableFailures"] == []
+
+
+def test_timetable_failure_creates_ten_minute_fallback(monkeypatch: Any) -> None:
+    monkeypatch.setenv("RAIL12306_TRUSTED_FORWARDERS", "trusted@example.com")
+    provider = FakeProvider()
+    result = process_message(
+        purchase_message(), provider, apply=True, timetable=FailingTimetable()  # type: ignore[arg-type]
+    )
+    assert result["timetableFailures"][0]["error"] == "TIMETABLE_UNAVAILABLE"
+    event = provider.created[0]
+    assert event["start"] == "2026-09-08T12:12:00+08:00"
+    assert event["end"] == "2026-09-08T12:22:00+08:00"
+    assert "时刻表待补充" in event["notes"]
 
 
 def test_apply_plan_is_idempotent_update() -> None:

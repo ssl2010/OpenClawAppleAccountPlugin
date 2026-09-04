@@ -55,7 +55,8 @@
       "apple_calendar_create_event",
       "apple_calendar_update_event",
       "apple_calendar_delete_event",
-      "apple_rail12306_plan_email"
+      "apple_rail12306_plan_email",
+      "rail12306_lookup_timetable"
     ]
   },
   "toolMetadata": {
