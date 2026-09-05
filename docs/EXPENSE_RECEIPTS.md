@@ -66,8 +66,9 @@ durable. Archived mail remains untouched under the configured mail policy.
 
 State and audit records contain hashes and minimal provenance, not mail bodies.
 Feishu notices redact full invoice/identity numbers. Gmail messages are moved only
-to Trash, never permanently deleted. Nextcloud credentials must be loaded from a
-0600 environment file; credentials embedded in a sync script are not acceptable.
+to Trash, never permanently deleted. Nextcloud's non-secret settings must be loaded
+from a 0600 environment file. Credentials belong in a 0600 `~/.netrc`;
+command-line passwords and credentials embedded in a sync script are not acceptable.
 Synchronization must check the CLI exit status and retain an actionable failure
 record. Production enablement requires sanitized fixtures for every observed format,
 unit/causal tests, an isolated filesystem integration test, dry-run Gmail discovery,

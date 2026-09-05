@@ -13,16 +13,18 @@ set +a
 
 : "${NEXTCLOUD_SERVER_URL:?NEXTCLOUD_SERVER_URL is required}"
 : "${NEXTCLOUD_USERNAME:?NEXTCLOUD_USERNAME is required}"
-: "${NEXTCLOUD_PASSWORD:?NEXTCLOUD_PASSWORD is required}"
 LOCAL_DIR="${NEXTCLOUD_LOCAL_DIR:-$HOME/nextcloud}"
 LOG_DIR="${NEXTCLOUD_LOG_DIR:-$HOME/.local/state/nextcloud-sync}"
 TRUST_CERT="${NEXTCLOUD_TRUST_CERT:-0}"
+NETRC_FILE="$HOME/.netrc"
 
 command -v nextcloudcmd >/dev/null || { echo "错误: 未找到 nextcloudcmd" >&2; exit 1; }
 [[ -d "$LOCAL_DIR" ]] || { echo "错误: 本地目录不存在: $LOCAL_DIR" >&2; exit 1; }
+[[ -f "$NETRC_FILE" && ! -L "$NETRC_FILE" ]] || { echo "错误: 缺少普通文件 $NETRC_FILE" >&2; exit 1; }
+[[ "$(stat -c %a "$NETRC_FILE")" == "600" ]] || { echo "错误: $NETRC_FILE 权限必须为 600" >&2; exit 1; }
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/nextcloud-sync-$(date '+%Y%m%d').log"
-COMMAND=(nextcloudcmd --non-interactive --user "$NEXTCLOUD_USERNAME" --password "$NEXTCLOUD_PASSWORD")
+COMMAND=(nextcloudcmd --non-interactive --netrc)
 [[ "$TRUST_CERT" == "1" ]] && COMMAND+=(--trust)
 COMMAND+=("$LOCAL_DIR" "$NEXTCLOUD_SERVER_URL")
 
