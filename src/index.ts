@@ -58,9 +58,19 @@ const eventFields = {
   notes: Type.Optional(Type.String({ maxLength: 20_000 })),
 };
 
+const reminderFields = {
+  title: Type.String({ minLength: 1, maxLength: 500 }),
+  notes: Type.Optional(Type.String({ maxLength: 20_000 })),
+  time: Type.Optional(Type.String({ minLength: 10 })),
+  urgent: Type.Optional(Type.Boolean()),
+  remindMinutesBefore: Type.Optional(Type.Integer({ minimum: 0, maximum: 10080 })),
+  allDay: Type.Optional(Type.Boolean()),
+  timezone: Type.Optional(Type.String({ maxLength: 100 })),
+};
+
 export default defineToolPlugin({
   id: "apple-account", name: "Apple Account",
-  description: "Security-focused pyiCloud tools for personal Apple Calendar data.",
+  description: "Security-focused pyiCloud tools for Apple Calendar, Reminders, and related workflows.",
   configSchema: Type.Object({
     pythonPath: Type.Optional(Type.String()), sessionDirectory: Type.Optional(Type.String()),
     passwordFile: Type.Optional(Type.String()), appleIdEnv: Type.Optional(Type.String()),
@@ -82,5 +92,12 @@ export default defineToolPlugin({
     tool({ name: "expense_receipts_status", label: "Expense Receipt Status", description: "Read deterministic trip candidates, pending-review counts, and missing boarding credentials without changing files or mail.", parameters: Type.Object({}, { additionalProperties: false }), execute: (_, config, context) => invokeBridge("expense.status", {}, config, context.signal) }),
     tool({ name: "expense_receipts_list_pending", label: "List Pending Expense Receipts", description: "List a bounded set of receipt artifacts that require owner review; does not classify or move them.", parameters: Type.Object({ limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })) }, { additionalProperties: false }), execute: (params, config, context) => invokeBridge("expense.pending", params, config, context.signal) }),
     tool({ name: "expense_receipts_import_attachment", label: "Import Expense Receipt Attachment", description: "Import one Feishu-downloaded PDF, OFD, XML, or EML from an explicitly approved inbound media directory into the deterministic receipt ledger.", parameters: Type.Object({ path: Type.String({ minLength: 1, maxLength: 4096 }), label: Type.Optional(Type.String({ maxLength: 200 })) }, { additionalProperties: false }), optional: true, execute: (params, config, context) => invokeBridge("expense.import_attachment", params, config, context.signal) }),
+    tool({ name: "apple_reminders_list_lists", label: "List Apple Reminder Lists", description: "List writable iCloud Reminder lists and their stable identifiers.", parameters: Type.Object({}, { additionalProperties: false }), execute: (_, config, context) => invokeBridge("reminder.lists", {}, config, context.signal) }),
+    tool({ name: "apple_reminders_list", label: "List Apple Reminders", description: "List a bounded set of reminders in one exact iCloud Reminder list.", parameters: Type.Object({ listId: Type.String({ minLength: 1 }), includeCompleted: Type.Optional(Type.Boolean()), limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 200 })) }, { additionalProperties: false }), execute: (params, config, context) => invokeBridge("reminder.list", params, config, context.signal) }),
+    tool({ name: "apple_reminders_get", label: "Get Apple Reminder", description: "Read one exactly identified iCloud Reminder.", parameters: Type.Object({ reminderId: Type.String({ minLength: 1 }) }, { additionalProperties: false }), execute: (params, config, context) => invokeBridge("reminder.get", params, config, context.signal) }),
+    tool({ name: "apple_reminders_create", label: "Create Apple Reminder", description: "Create an iCloud Reminder with title, notes, actual time, urgency, and optional advance notice, then verify it by exact read-back.", parameters: Type.Object({ listId: Type.String({ minLength: 1 }), ...reminderFields }, { additionalProperties: false }), optional: true, execute: (params, config, context) => invokeBridge("reminder.create", params, config, context.signal) }),
+    tool({ name: "apple_reminders_update", label: "Update Apple Reminder", description: "Update one exactly identified iCloud Reminder and verify all requested fields by read-back.", parameters: Type.Object({ reminderId: Type.String({ minLength: 1 }), title: Type.Optional(reminderFields.title), notes: reminderFields.notes, time: reminderFields.time, urgent: reminderFields.urgent, remindMinutesBefore: reminderFields.remindMinutesBefore, allDay: reminderFields.allDay, timezone: reminderFields.timezone }, { additionalProperties: false }), optional: true, execute: (params, config, context) => invokeBridge("reminder.update", params, config, context.signal) }),
+    tool({ name: "apple_reminders_complete", label: "Complete Apple Reminder", description: "Mark one exactly identified iCloud Reminder complete or reopen it, with read-back verification.", parameters: Type.Object({ reminderId: Type.String({ minLength: 1 }), completed: Type.Optional(Type.Boolean()) }, { additionalProperties: false }), optional: true, execute: (params, config, context) => invokeBridge("reminder.complete", params, config, context.signal) }),
+    tool({ name: "apple_reminders_delete", label: "Delete Apple Reminder", description: "Soft-delete one exactly identified iCloud Reminder after explicit confirmation and verify it is absent from the readable list.", parameters: Type.Object({ reminderId: Type.String({ minLength: 1 }) }, { additionalProperties: false }), optional: true, execute: (params, config, context) => invokeBridge("reminder.delete", params, config, context.signal) }),
   ],
 });

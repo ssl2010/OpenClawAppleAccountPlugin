@@ -18,6 +18,9 @@ describe("apple-account plugin metadata", () => {
     expect(names).toContain("rail12306_lookup_timetable");
     expect(names).toContain("expense_receipts_status");
     expect(names).toContain("expense_receipts_list_pending");
+    expect(names).toContain("apple_reminders_create");
+    expect(names).toContain("apple_reminders_delete");
     expect(metadata?.tools.find((item) => item.name === "apple_calendar_delete_event")?.optional).toBe(true);
+    expect(metadata?.tools.find((item) => item.name === "apple_reminders_create")?.optional).toBe(true);
   });
 });

@@ -45,6 +45,13 @@ def dispatch(
                 "calendar.create": lambda: provider.create_event(params),
                 "calendar.update": lambda: provider.update_event(params),
                 "calendar.delete": lambda: provider.delete_event(params),
+                "reminder.lists": provider.list_reminder_lists,
+                "reminder.list": lambda: provider.list_reminders(params),
+                "reminder.get": lambda: provider.get_reminder(params),
+                "reminder.create": lambda: provider.create_reminder(params),
+                "reminder.update": lambda: provider.update_reminder(params),
+                "reminder.complete": lambda: provider.complete_reminder(params),
+                "reminder.delete": lambda: provider.delete_reminder(params),
             }
             if operation not in handlers:
                 raise BridgeError("INVALID_REQUEST", "Unknown operation.")

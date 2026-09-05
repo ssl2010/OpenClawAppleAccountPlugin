@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Private JSON bridge between OpenClaw and Apple account services."
 requires-python = ">=3.11"
 dependencies = [
-  "pyicloud>=2.6.5,<3",
+  "pyicloud==2.6.5",
   "requests>=2.31,<3",
 ]
 

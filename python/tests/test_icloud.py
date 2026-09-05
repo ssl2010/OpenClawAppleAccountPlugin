@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from copy import deepcopy
+from types import SimpleNamespace
 from typing import Any, ClassVar
 
 import pytest
@@ -67,6 +69,37 @@ class FakeService:
 
     def __init__(self, *_args: Any, **_kwargs: Any) -> None:
         self.calendar = FakeCalendar()
+        self.reminders = FakeReminders()
+
+
+class FakeReminders:
+    def __init__(self) -> None:
+        self.items: dict[str, Any] = {}
+
+    def lists(self) -> list[Any]:
+        return [SimpleNamespace(id="List/tasks", title="任务", count=len(self.items), is_group=False)]
+
+    def create(self, **kwargs: Any) -> Any:
+        item = SimpleNamespace(
+            id="Reminder/test", list_id=kwargs["list_id"], title=kwargs["title"],
+            desc=kwargs["desc"], completed=False, deleted=False, due_date=kwargs["due_date"],
+            priority=kwargs["priority"], flagged=kwargs["flagged"],
+            all_day=kwargs["all_day"], time_zone=kwargs["time_zone"],
+        )
+        self.items[item.id] = item
+        return deepcopy(item)
+
+    def get(self, reminder_id: str) -> Any:
+        return deepcopy(self.items[reminder_id])
+
+    def update(self, reminder: Any) -> None:
+        self.items[reminder.id] = deepcopy(reminder)
+
+    def delete(self, reminder: Any) -> None:
+        self.items.pop(reminder.id)
+
+    def list_reminders(self, **_kwargs: Any) -> Any:
+        return SimpleNamespace(reminders=[deepcopy(item) for item in self.items.values()])
 
 
 def provider(monkeypatch: Any, tmp_path: Any) -> ICloudProvider:
@@ -97,6 +130,46 @@ def test_create_preserves_notes_and_url(monkeypatch: Any, tmp_path: Any) -> None
         }
     )
     assert result["committed"] is True
+
+
+def test_reminder_create_maps_urgency_and_advance_notice(monkeypatch: Any, tmp_path: Any) -> None:
+    alarms = []
+    monkeypatch.setattr(
+        "openclaw_apple_bridge.icloud.add_date_alarm",
+        lambda _service, _reminder, trigger, timezone: alarms.append((trigger, timezone)),
+    )
+    client = provider(monkeypatch, tmp_path)
+    result = client.create_reminder({
+        "listId": "List/tasks", "title": "提交报告", "notes": "附数据表",
+        "time": "2026-09-08T10:00:00+08:00", "urgent": True,
+        "remindMinutesBefore": 30, "timezone": "Asia/Shanghai",
+    })
+    assert result["committed"] is True
+    assert result["actualTime"] == "2026-09-08T10:00:00+08:00"
+    assert result["reminderTime"] == "2026-09-08T10:00:00+08:00"
+    assert result["remindMinutesBefore"] == 30
+    assert alarms == [(parse_rfc3339("2026-09-08T09:30:00+08:00"), "Asia/Shanghai")]
+
+
+def test_advance_notice_requires_explicit_actual_time() -> None:
+    with pytest.raises(BridgeError, match="time is required"):
+        ICloudProvider._reminder_schedule(
+            {"remindMinutesBefore": 15},
+            default_actual=parse_rfc3339("2026-09-08T10:00:00+08:00"),
+        )
+
+
+def test_all_day_rejects_minute_advance_notice() -> None:
+    with pytest.raises(BridgeError, match="All-day"):
+        ICloudProvider._reminder_schedule({
+            "time": "2026-09-08T00:00:00+08:00", "allDay": True,
+            "remindMinutesBefore": 15,
+        })
+
+
+def test_urgent_requires_actual_time() -> None:
+    with pytest.raises(BridgeError, match="urgent alarm"):
+        ICloudProvider._reminder_schedule({"urgent": True})
 
 
 def test_real_pyicloud_date_arrays_are_minutes_not_seconds() -> None:

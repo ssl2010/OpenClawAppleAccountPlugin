@@ -1,7 +1,7 @@
 {
   "id": "apple-account",
   "name": "Apple Account",
-  "description": "Security-focused pyiCloud tools for personal Apple Calendar data.",
+  "description": "Security-focused pyiCloud tools for Apple Calendar, Reminders, and related workflows.",
   "version": "0.1.0",
   "activation": {
     "onStartup": true
@@ -62,7 +62,14 @@
       "rail12306_lookup_timetable",
       "expense_receipts_status",
       "expense_receipts_list_pending",
-      "expense_receipts_import_attachment"
+      "expense_receipts_import_attachment",
+      "apple_reminders_list_lists",
+      "apple_reminders_list",
+      "apple_reminders_get",
+      "apple_reminders_create",
+      "apple_reminders_update",
+      "apple_reminders_complete",
+      "apple_reminders_delete"
     ]
   },
   "toolMetadata": {
@@ -76,6 +83,18 @@
       "optional": true
     },
     "expense_receipts_import_attachment": {
+      "optional": true
+    },
+    "apple_reminders_create": {
+      "optional": true
+    },
+    "apple_reminders_update": {
+      "optional": true
+    },
+    "apple_reminders_complete": {
+      "optional": true
+    },
+    "apple_reminders_delete": {
       "optional": true
     }
   }

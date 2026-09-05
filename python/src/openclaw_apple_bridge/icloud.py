@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +12,7 @@ from pyicloud.services.calendar import EventObject
 
 from .errors import BridgeError, classify_exception
 from .models import normalize_calendar, normalize_event, parse_rfc3339
+from .reminder_alarm import add_date_alarm
 
 
 class ICloudProvider:
@@ -84,6 +85,11 @@ class ICloudProvider:
                 "calendar.create",
                 "calendar.update",
                 "calendar.delete",
+                "reminders.read",
+                "reminders.create",
+                "reminders.update",
+                "reminders.complete",
+                "reminders.delete",
             ],
         }
 
@@ -175,6 +181,187 @@ class ICloudProvider:
         )
         response = service.calendar.remove_event(event)
         return self._mutation_result("deleted", event, response, service.calendar, params)
+
+    def list_reminder_lists(self) -> list[dict[str, Any]]:
+        return [
+            {"id": item.id, "title": item.title, "count": item.count}
+            for item in self._service().reminders.lists()
+            if not item.is_group
+        ]
+
+    def list_reminders(self, params: dict[str, Any]) -> list[dict[str, Any]]:
+        limit = min(max(int(params.get("limit", 50)), 1), 200)
+        batch = self._service().reminders.list_reminders(
+            list_id=str(params["listId"]),
+            include_completed=bool(params.get("includeCompleted", False)),
+            results_limit=limit,
+        )
+        return [self._normalize_reminder(item) for item in batch.reminders[:limit]]
+
+    def get_reminder(self, params: dict[str, Any]) -> dict[str, Any]:
+        return self._normalize_reminder(
+            self._service().reminders.get(str(params["reminderId"]))
+        )
+
+    def create_reminder(self, params: dict[str, Any]) -> dict[str, Any]:
+        service = self._service().reminders
+        actual_at, due_at, notes = self._reminder_schedule(params)
+        reminder = service.create(
+            list_id=str(params["listId"]), title=str(params["title"]), desc=notes,
+            due_date=due_at, priority=1 if params.get("urgent") else 0,
+            flagged=False, all_day=bool(params.get("allDay", False)),
+            time_zone=str(params.get("timezone") or "Asia/Shanghai"),
+        )
+        advance = int(params.get("remindMinutesBefore", 0))
+        if actual_at and (params.get("urgent") or "remindMinutesBefore" in params):
+            try:
+                add_date_alarm(
+                    service, reminder, actual_at - timedelta(minutes=advance),
+                    str(params.get("timezone") or "Asia/Shanghai"),
+                )
+            except Exception as exc:
+                raise BridgeError(
+                    "MUTATION_UNKNOWN",
+                    "Reminder exists, but its native Apple alarm needs reconciliation.",
+                ) from exc
+        expected = {
+            "listId": str(params["listId"]), "title": str(params["title"]),
+            "notes": notes, "dueAt": due_at.isoformat() if due_at else None,
+            "urgent": bool(params.get("urgent")), "flagged": False,
+        }
+        return self._reminder_mutation_result(
+            "created", service, reminder.id, expected,
+            actual_at=actual_at, advance=advance,
+        )
+
+    def update_reminder(self, params: dict[str, Any]) -> dict[str, Any]:
+        service = self._service().reminders
+        reminder = service.get(str(params["reminderId"]))
+        if reminder.id != str(params["reminderId"]):
+            raise BridgeError("CONFLICT", "Apple returned a different reminder.")
+        if reminder.alarm_ids and any(
+            key in params for key in ("time", "remindMinutesBefore", "urgent", "allDay", "timezone")
+        ):
+            raise BridgeError(
+                "INVALID_REQUEST",
+                "Changing the schedule of an existing native alarm is not supported safely; "
+                "create a replacement reminder after explicit confirmation.",
+            )
+        actual_at, due_at, notes = self._reminder_schedule(
+            params,
+            default_actual=reminder.due_date,
+            default_notes=reminder.desc,
+        )
+        reminder.title = str(params.get("title", reminder.title))
+        reminder.desc = notes
+        reminder.due_date = due_at
+        urgent = bool(params.get("urgent", reminder.priority == 1 or reminder.flagged))
+        reminder.priority = 1 if urgent else 0
+        reminder.flagged = False
+        reminder.all_day = bool(params.get("allDay", reminder.all_day))
+        reminder.time_zone = str(params.get("timezone") or reminder.time_zone or "Asia/Shanghai")
+        service.update(reminder)
+        advance = int(params.get("remindMinutesBefore", 0))
+        if actual_at and not reminder.alarm_ids and (
+            urgent or "remindMinutesBefore" in params
+        ):
+            try:
+                add_date_alarm(
+                    service, reminder, actual_at - timedelta(minutes=advance),
+                    reminder.time_zone,
+                )
+            except Exception as exc:
+                raise BridgeError(
+                    "MUTATION_UNKNOWN",
+                    "Reminder was updated, but its native Apple alarm needs reconciliation.",
+                ) from exc
+        return self._reminder_mutation_result(
+            "updated", service, reminder.id,
+            {"listId": reminder.list_id, "title": reminder.title, "notes": notes,
+             "dueAt": due_at.isoformat() if due_at else None, "urgent": urgent},
+            actual_at=actual_at, advance=advance,
+        )
+
+    def complete_reminder(self, params: dict[str, Any]) -> dict[str, Any]:
+        service = self._service().reminders
+        reminder = service.get(str(params["reminderId"]))
+        reminder.completed = bool(params.get("completed", True))
+        service.update(reminder)
+        actual = service.get(reminder.id)
+        if actual.id != reminder.id or actual.completed != reminder.completed:
+            raise BridgeError("MUTATION_UNKNOWN", "Apple write needs read-back reconciliation.")
+        return {"action": "completed" if actual.completed else "reopened",
+                "provider": "pyicloud", "reminderId": actual.id, "committed": True}
+
+    def delete_reminder(self, params: dict[str, Any]) -> dict[str, Any]:
+        service = self._service().reminders
+        reminder = service.get(str(params["reminderId"]))
+        service.delete(reminder)
+        remaining = service.list_reminders(
+            list_id=reminder.list_id, include_completed=True, results_limit=200,
+        ).reminders
+        if any(item.id == reminder.id for item in remaining):
+            raise BridgeError("MUTATION_UNKNOWN", "Apple write needs read-back reconciliation.")
+        return {"action": "deleted", "provider": "pyicloud",
+                "reminderId": reminder.id, "committed": True}
+
+    @staticmethod
+    def _normalize_reminder(reminder: Any) -> dict[str, Any]:
+        return {
+            "reminderId": str(reminder.id), "listId": str(reminder.list_id),
+            "title": str(reminder.title), "notes": str(reminder.desc or ""),
+            "dueAt": reminder.due_date.isoformat() if reminder.due_date else None,
+            "completed": bool(reminder.completed), "deleted": bool(reminder.deleted),
+            "urgent": bool(reminder.priority == 1 or reminder.flagged),
+            "priority": int(reminder.priority), "flagged": bool(reminder.flagged),
+            "allDay": bool(reminder.all_day), "timezone": reminder.time_zone,
+        }
+
+    @staticmethod
+    def _reminder_schedule(
+        params: dict[str, Any], *, default_actual: datetime | None = None,
+        default_notes: str = "",
+    ) -> tuple[datetime | None, datetime | None, str]:
+        advance = int(params.get("remindMinutesBefore", 0))
+        if not 0 <= advance <= 10080:
+            raise BridgeError("INVALID_REQUEST", "remindMinutesBefore must be 0 to 10080.")
+        raw_actual = params.get("time")
+        actual = parse_rfc3339(str(raw_actual)) if raw_actual else default_actual
+        if params.get("urgent") and actual is None:
+            raise BridgeError("INVALID_REQUEST", "An actual time is required for an urgent alarm.")
+        if "remindMinutesBefore" in params and advance and not raw_actual:
+            raise BridgeError("INVALID_REQUEST", "time is required when changing advance notice.")
+        if advance and actual is None:
+            raise BridgeError("INVALID_REQUEST", "An actual time is required for advance notice.")
+        if params.get("allDay") and advance:
+            raise BridgeError("INVALID_REQUEST", "All-day reminders cannot use minute advance notice.")
+        due = actual
+        user_notes = str(params.get("notes", default_notes)).strip()
+        notes = user_notes
+        return actual, due, notes
+
+    def _reminder_mutation_result(
+        self, action: str, service: Any, reminder_id: str, expected: dict[str, Any],
+        *, actual_at: datetime | None, advance: int,
+    ) -> dict[str, Any]:
+        try:
+            actual = self._normalize_reminder(service.get(reminder_id))
+            for key, value in expected.items():
+                if key == "dueAt":
+                    observed = parse_rfc3339(actual[key]) if actual[key] else None
+                    wanted = parse_rfc3339(value) if value else None
+                    if observed != wanted:
+                        raise ValueError("Reminder due time differs")
+                elif actual[key] != value:
+                    raise ValueError("Reminder field differs")
+        except Exception as exc:
+            raise BridgeError(
+                "MUTATION_UNKNOWN", "Apple reminder write needs read-back reconciliation."
+            ) from exc
+        return {"action": action, "provider": "pyicloud", "reminderId": reminder_id,
+                "committed": True,
+                "actualTime": actual_at.isoformat() if actual_at else None,
+                "reminderTime": actual["dueAt"], "remindMinutesBefore": advance}
 
     @staticmethod
     def _assert_identity(current: dict[str, Any], params: dict[str, Any]) -> None:
