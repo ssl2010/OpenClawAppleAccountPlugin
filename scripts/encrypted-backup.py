@@ -21,7 +21,7 @@ EXTERNAL = (".config/openclaw", ".config/openclaw-apple-account",
             ".local/state/openclaw-apple-account",
             ".local/state/openclaw-mail-management", ".config/systemd/user")
 EXTERNAL += (".config/openclaw-expense-receipts",
-             ".local/state/openclaw-expense-receipts", ".config/nextcloud-sync")
+             ".local/state/openclaw-expense-receipts", ".config/nextcloud-sync", ".netrc")
 
 
 def run(args):
