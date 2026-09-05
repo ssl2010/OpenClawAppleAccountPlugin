@@ -3,6 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from .errors import BridgeError, classify_exception
+from .expense_api import import_attachment as expense_import_attachment
+from .expense_api import pending as expense_pending
+from .expense_api import status as expense_status
 from .icloud import ICloudProvider
 from .rail12306 import plan_email
 from .timetable import RailwayTimetable
@@ -20,6 +23,12 @@ def dispatch(
             raise BridgeError("INVALID_REQUEST", "params must be an object.")
         if operation == "rail12306.plan":
             data = plan_email(params)
+        elif operation == "expense.status":
+            data = expense_status(request.get("config") or {})
+        elif operation == "expense.pending":
+            data = expense_pending(request.get("config") or {}, int(params.get("limit", 20)))
+        elif operation == "expense.import_attachment":
+            data = expense_import_attachment(request.get("config") or {}, params)
         elif operation == "rail12306.timetable":
             data = RailwayTimetable(
                 timeout_seconds=float(

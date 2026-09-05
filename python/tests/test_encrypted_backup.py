@@ -38,7 +38,8 @@ def test_failed_snapshot_restores_active_units(monkeypatch):
     with pytest.raises(RuntimeError, match="snapshot failed"), backup.quiesce():
         raise RuntimeError("snapshot failed")
     starts = [c[-1] for c in calls if "start" in c]
-    assert starts == ["openclaw-gateway.service", backup.UNITS[0]]
+    expected_active = [unit for unit in backup.UNITS if unit != backup.UNITS[1]]
+    assert starts == ["openclaw-gateway.service", *reversed(expected_active)]
     assert backup.UNITS[1] not in starts
 
 

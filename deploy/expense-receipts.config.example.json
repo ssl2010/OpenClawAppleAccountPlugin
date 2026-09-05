@@ -1,0 +1,13 @@
+{
+  "account": "owner@example.com",
+  "stateDir": "/home/USER/.local/state/openclaw-expense-receipts",
+  "nextcloudRoot": "/home/USER/nextcloud/documents/出差报销",
+  "syncCommand": "/home/USER/bin/sync-netdisk",
+  "feishuTarget": "REPLACE_WITH_APPROVED_FEISHU_TARGET",
+  "timezone": "Asia/Shanghai",
+  "maxMessages": 100,
+  "maxTripDays": 30,
+  "allowedInboundRoots": ["/home/USER/.openclaw/media/inbound"],
+  "boardingGraceHours": 24,
+  "closureGraceHours": 72
+}

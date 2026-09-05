@@ -14,11 +14,14 @@ import time
 from pathlib import Path
 
 NAME = re.compile(r"us1-openclaw-(\d{8}T\d{6}Z)\.tar\.age$")
-UNITS = ("openclaw-mail-digest.timer", "openclaw-rail12306.timer")
+UNITS = ("openclaw-mail-digest.timer", "openclaw-rail12306.timer",
+         "openclaw-expense-receipts.timer", "openclaw-expense-reconcile.timer")
 EXTERNAL = (".config/openclaw", ".config/openclaw-apple-account",
             ".config/openclaw-mail-management", ".config/gogcli",
             ".local/state/openclaw-apple-account",
             ".local/state/openclaw-mail-management", ".config/systemd/user")
+EXTERNAL += (".config/openclaw-expense-receipts",
+             ".local/state/openclaw-expense-receipts", ".config/nextcloud-sync")
 
 
 def run(args):
@@ -41,7 +44,8 @@ def quiesce():
                 restart.append(unit)
                 run(["systemctl", "--user", "stop", unit])
         deadline = time.monotonic() + 1250
-        for unit in ("openclaw-mail-digest.service", "openclaw-rail12306.service"):
+        for unit in ("openclaw-mail-digest.service", "openclaw-rail12306.service",
+                     "openclaw-expense-receipts.service", "openclaw-expense-reconcile.service"):
             while run(["systemctl", "--user", "show", "-p", "ActiveState", "--value", unit]).strip() in {"active", "activating", "deactivating"}:
                 if time.monotonic() > deadline:
                     raise TimeoutError("Worker did not finish; backup cancelled")

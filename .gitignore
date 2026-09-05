@@ -21,3 +21,4 @@ cookies/
 *.age.sha256
 *identity.txt
 backups/
+tmp/

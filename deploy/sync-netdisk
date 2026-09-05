@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ENV_FILE="${NEXTCLOUD_ENV_FILE:-$HOME/.config/nextcloud-sync/env}"
+if [[ ! -r "$ENV_FILE" ]]; then
+  echo "错误: 缺少 Nextcloud 私有环境文件: $ENV_FILE" >&2
+  exit 1
+fi
+set -a
+# shellcheck disable=SC1090
+source "$ENV_FILE"
+set +a
+
+: "${NEXTCLOUD_SERVER_URL:?NEXTCLOUD_SERVER_URL is required}"
+: "${NEXTCLOUD_USERNAME:?NEXTCLOUD_USERNAME is required}"
+: "${NEXTCLOUD_PASSWORD:?NEXTCLOUD_PASSWORD is required}"
+LOCAL_DIR="${NEXTCLOUD_LOCAL_DIR:-$HOME/nextcloud}"
+LOG_DIR="${NEXTCLOUD_LOG_DIR:-$HOME/.local/state/nextcloud-sync}"
+TRUST_CERT="${NEXTCLOUD_TRUST_CERT:-0}"
+
+command -v nextcloudcmd >/dev/null || { echo "错误: 未找到 nextcloudcmd" >&2; exit 1; }
+[[ -d "$LOCAL_DIR" ]] || { echo "错误: 本地目录不存在: $LOCAL_DIR" >&2; exit 1; }
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/nextcloud-sync-$(date '+%Y%m%d').log"
+COMMAND=(nextcloudcmd --non-interactive --user "$NEXTCLOUD_USERNAME" --password "$NEXTCLOUD_PASSWORD")
+[[ "$TRUST_CERT" == "1" ]] && COMMAND+=(--trust)
+COMMAND+=("$LOCAL_DIR" "$NEXTCLOUD_SERVER_URL")
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] START user=$NEXTCLOUD_USERNAME local_dir=$LOCAL_DIR server=$NEXTCLOUD_SERVER_URL trust=$TRUST_CERT" >> "$LOG_FILE"
+if "${COMMAND[@]}" >> "$LOG_FILE" 2>&1; then
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] SUCCESS" >> "$LOG_FILE"
+else
+  status=$?
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] FAIL exit_code=$status" >> "$LOG_FILE"
+  exit "$status"
+fi

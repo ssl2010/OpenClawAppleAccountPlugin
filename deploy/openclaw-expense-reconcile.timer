@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightly travel expense receipt reconciliation
+
+[Timer]
+OnCalendar=*-*-* 22:10:00 Asia/Shanghai
+AccuracySec=30s
+Persistent=true
+Unit=openclaw-expense-reconcile.service
+
+[Install]
+WantedBy=timers.target

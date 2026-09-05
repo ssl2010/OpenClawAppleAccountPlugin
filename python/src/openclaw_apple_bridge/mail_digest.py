@@ -5,6 +5,7 @@ import argparse
 import fcntl
 import json
 import re
+import sqlite3
 import subprocess
 import tempfile
 import time
@@ -15,6 +16,7 @@ from typing import Any
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
+from .expense_receipts import mail_disposition
 from .rail12306 import email_text, unwrap_external
 from .rail12306_worker import _save_state
 
@@ -95,6 +97,31 @@ def latest_slot(now: datetime, times: list[str]) -> str | None:
 
 def received_ms(message: dict[str, Any]) -> int:
     return int(message["message"]["internalDate"])
+
+
+def cleanup_allowed(message: dict[str, Any], config: dict[str, Any]) -> bool:
+    """Fail closed for test bundles and travel mail not durably ingested yet."""
+    subject = clean(message["headers"].get("subject"))
+    body = email_text(str(message.get("body") or ""))[:6000]
+    disposition = mail_disposition(subject, str(message["headers"].get("from", "")), body)
+    if disposition == "test_bundle":
+        return False
+    if disposition != "travel_candidate":
+        return True
+    path_value = config.get("expenseStateDb")
+    if not path_value:
+        return False
+    path = Path(path_value).expanduser()
+    if not path.is_file():
+        return False
+    try:
+        with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as database:
+            row = database.execute(
+                "SELECT disposition FROM messages WHERE id=?", (str(message["message"]["id"]),)
+            ).fetchone()
+    except (sqlite3.Error, OSError):
+        return False
+    return bool(row and row[0] == "travel_candidate")
 
 
 class Services:
@@ -251,9 +278,18 @@ def run(config: dict[str, Any], state: dict[str, Any], services: Services,
     start_ms = state.get("watermark", int(now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp() * 1000))
     end_ms = int(now.timestamp() * 1000)
     messages = services.fetch(start_ms, end_ms)
-    rows = [{"id": m["message"]["id"], "source": source_of(m, config["sources"]),
-             "subject": clean(m["headers"].get("subject")),
-             "body": email_text(str(m.get("body") or ""))[:6000]} for m in messages]
+    rows = []
+    for message in messages:
+        subject = clean(message["headers"].get("subject"))
+        body = email_text(str(message.get("body") or ""))[:6000]
+        # Travel candidates are handled by the durable receipt worker. Generic and
+        # non-travel invoices remain visible; never suppress on the word 发票 alone.
+        disposition = mail_disposition(subject, str(message["headers"].get("from", "")), body)
+        if disposition in {"test_bundle", "travel_candidate"}:
+            continue
+        rows.append({"id": message["message"]["id"],
+                     "source": source_of(message, config["sources"]),
+                     "subject": subject, "body": body})
     summaries, degraded = services.summarize(rows)
     chunks = render(rows, summaries, datetime.fromtimestamp(start_ms / 1000, now.tzinfo), now, degraded)
     cleanup = config.get("cleanup", {})
@@ -264,10 +300,11 @@ def run(config: dict[str, Any], state: dict[str, Any], services: Services,
     candidates = services.fetch(int(clean_start.timestamp() * 1000),
                                 int((clean_start + timedelta(days=1)).timestamp() * 1000),
                                 inbox=cleanup.get("scope", "inbox") == "inbox") if first else []
+    candidates = [message for message in candidates if cleanup_allowed(message, config)]
     if preview:
         return {"status": "preview", "messages": chunks, "count": len(rows),
                 "cleanupDate": cleanup_key, "cleanupCount": len(candidates), "cleanupEnabled": cleanup.get("enabled", False)}
-    ids = [m["message"]["id"] for m in messages]
+    ids = [r["id"] for r in rows]
     state["outbox"] = {"status": "sending", "slot": slot, "ids": ids, "receipts": []}
     save(state)
     for chunk in chunks:

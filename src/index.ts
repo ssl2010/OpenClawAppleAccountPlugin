@@ -7,6 +7,7 @@ type PluginConfig = {
   pythonPath?: string; sessionDirectory?: string; passwordFile?: string;
   appleIdEnv?: string; region?: "global" | "china";
   requestTimeoutSeconds?: number; bridgeTimeoutSeconds?: number;
+  expenseConfig?: string;
 };
 type BridgeResponse = { protocolVersion: number; requestId: string; ok: boolean; data?: unknown; error?: { code: string; message: string; retryable: boolean } };
 
@@ -66,6 +67,7 @@ export default defineToolPlugin({
     region: Type.Optional(Type.Union([Type.Literal("global"), Type.Literal("china")])),
     requestTimeoutSeconds: Type.Optional(Type.Number({ minimum: 5, maximum: 60 })),
     bridgeTimeoutSeconds: Type.Optional(Type.Number({ minimum: 5, maximum: 120 })),
+    expenseConfig: Type.Optional(Type.String()),
   }, { additionalProperties: false }),
   tools: (tool) => [
     tool({ name: "apple_account_status", label: "Apple Account Status", description: "Check pyiCloud authentication and Calendar capability without triggering a new 2FA prompt.", parameters: Type.Object({}, { additionalProperties: false }), execute: (_, config, context) => invokeBridge("account.status", {}, config, context.signal) }),
@@ -77,5 +79,8 @@ export default defineToolPlugin({
     tool({ name: "apple_calendar_delete_event", label: "Delete Apple Calendar Event", description: "Permanently delete one exactly identified Apple Calendar event after explicit confirmation unless a stored approval applies.", parameters: Type.Object({ calendarId: Type.String(), eventId: Type.String() }, { additionalProperties: false }), optional: true, execute: (params, config, context) => invokeBridge("calendar.delete", params, config, context.signal) }),
     tool({ name: "apple_rail12306_plan_email", label: "Plan 12306 Calendar Changes", description: "Deterministically parse a bounded 12306 email as untrusted data and plan idempotent create, update, or delete actions without executing them.", parameters: Type.Object({ messageId: Type.String({ minLength: 1 }), subject: Type.String({ maxLength: 1000 }), body: Type.String({ minLength: 1, maxLength: 200_000 }), stationCityAliases: Type.Optional(Type.Record(Type.String(), Type.String())) }, { additionalProperties: false }), execute: (params, config, context) => invokeBridge("rail12306.plan", params, config, context.signal) }),
     tool({ name: "rail12306_lookup_timetable", label: "Look Up 12306 Timetable", description: "Look up an exact dated train segment using the official 12306 public timetable and return its scheduled arrival time.", parameters: Type.Object({ travelDate: Type.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}$" }), trainNumber: Type.String({ minLength: 2, maxLength: 8 }), originStation: Type.String({ minLength: 1, maxLength: 100 }), destinationStation: Type.String({ minLength: 1, maxLength: 100 }) }, { additionalProperties: false }), execute: (params, config, context) => invokeBridge("rail12306.timetable", params, config, context.signal) }),
+    tool({ name: "expense_receipts_status", label: "Expense Receipt Status", description: "Read deterministic trip candidates, pending-review counts, and missing boarding credentials without changing files or mail.", parameters: Type.Object({}, { additionalProperties: false }), execute: (_, config, context) => invokeBridge("expense.status", {}, config, context.signal) }),
+    tool({ name: "expense_receipts_list_pending", label: "List Pending Expense Receipts", description: "List a bounded set of receipt artifacts that require owner review; does not classify or move them.", parameters: Type.Object({ limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })) }, { additionalProperties: false }), execute: (params, config, context) => invokeBridge("expense.pending", params, config, context.signal) }),
+    tool({ name: "expense_receipts_import_attachment", label: "Import Expense Receipt Attachment", description: "Import one Feishu-downloaded PDF, OFD, XML, or EML from an explicitly approved inbound media directory into the deterministic receipt ledger.", parameters: Type.Object({ path: Type.String({ minLength: 1, maxLength: 4096 }), label: Type.Optional(Type.String({ maxLength: 200 })) }, { additionalProperties: false }), optional: true, execute: (params, config, context) => invokeBridge("expense.import_attachment", params, config, context.signal) }),
   ],
 });

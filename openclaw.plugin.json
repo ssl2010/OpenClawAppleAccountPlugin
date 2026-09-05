@@ -42,6 +42,9 @@
         "type": "number",
         "minimum": 5,
         "maximum": 120
+      },
+      "expenseConfig": {
+        "type": "string"
       }
     },
     "additionalProperties": false
@@ -56,7 +59,10 @@
       "apple_calendar_update_event",
       "apple_calendar_delete_event",
       "apple_rail12306_plan_email",
-      "rail12306_lookup_timetable"
+      "rail12306_lookup_timetable",
+      "expense_receipts_status",
+      "expense_receipts_list_pending",
+      "expense_receipts_import_attachment"
     ]
   },
   "toolMetadata": {
@@ -67,6 +73,9 @@
       "optional": true
     },
     "apple_calendar_delete_event": {
+      "optional": true
+    },
+    "expense_receipts_import_attachment": {
       "optional": true
     }
   }

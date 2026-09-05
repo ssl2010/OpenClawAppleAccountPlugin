@@ -1,0 +1,17 @@
+[Unit]
+Description=Collect and reconcile travel expense receipts
+After=network-online.target openclaw-gateway.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/work/OpenClawAppleAccountPlugin
+EnvironmentFile=%h/.config/openclaw/gog.env
+ExecStart=%h/work/OpenClawAppleAccountPlugin/.venv/bin/openclaw-expense-receipts --collect-only
+TimeoutStartSec=1200
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.local/state/openclaw-expense-receipts %h/nextcloud/documents/出差报销 %h/.local/state/nextcloud-sync

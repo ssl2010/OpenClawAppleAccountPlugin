@@ -22,6 +22,7 @@ dev = [
 [project.scripts]
 openclaw-apple-bridge = "openclaw_apple_bridge.cli:main"
 openclaw-rail12306-worker = "openclaw_apple_bridge.rail12306_worker:main"
+openclaw-expense-receipts = "openclaw_apple_bridge.expense_worker:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

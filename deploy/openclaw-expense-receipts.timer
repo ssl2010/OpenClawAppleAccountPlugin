@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Gmail for travel expense receipts every ten minutes
+
+[Timer]
+OnCalendar=*-*-* *:0/10:00
+AccuracySec=15s
+Persistent=true
+Unit=openclaw-expense-receipts.service
+
+[Install]
+WantedBy=timers.target

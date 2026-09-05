@@ -1,0 +1,4 @@
+interface:
+  display_name: "差旅票据管理"
+  short_description: "整理闭环差旅行程、票据归档、缺件提示与待确认分类处理"
+  default_prompt: "使用 $expense-receipts 检查差旅票据处理状态，列出缺失凭证和需要我确认的分类。"

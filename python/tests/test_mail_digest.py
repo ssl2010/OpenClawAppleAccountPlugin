@@ -9,6 +9,7 @@ import pytest
 
 from openclaw_apple_bridge.mail_digest import (
     Services,
+    cleanup_allowed,
     latest_slot,
     previous_workday,
     render,
@@ -175,6 +176,48 @@ def test_render_empty_and_all_source_sections() -> None:
     rows = [{"id": str(i), "source": label} for i, label in enumerate(SOURCES.values())]
     output = render(rows, {str(i): "事宜" for i in range(4)}, NOW, NOW, False)[0]
     assert all(label in output for label in SOURCES.values())
+
+
+def test_expense_test_bundle_is_not_in_digest() -> None:
+    svc = FakeServices()
+    svc.messages[0]["headers"]["subject"] = "openclaw票据报销测试3"
+    state: dict[str, Any] = {}
+    result = run(config(), state, svc, lambda _: None, NOW)
+    assert result["count"] == 0
+    assert "没有新邮件" in svc.sent[0]
+    assert state["outbox"]["ids"] == []
+
+
+def test_travel_receipt_is_hidden_but_generic_invoice_remains() -> None:
+    svc = FakeServices()
+    svc.messages = [mail("travel", NOW.replace(hour=8)), mail("generic", NOW.replace(hour=8, minute=1))]
+    svc.messages[0]["headers"].update(subject="网上购票系统-电子发票通知", **{"from": "12306@rails.com.cn"})
+    svc.messages[1]["headers"]["subject"] = "计算机学会电子发票"
+    state: dict[str, Any] = {}
+    result = run(config(), state, svc, lambda _: None, NOW)
+    assert result["count"] == 1
+    assert state["outbox"]["ids"] == ["generic"]
+
+
+def test_test_bundle_is_never_eligible_for_routine_cleanup() -> None:
+    message = mail()
+    message["headers"]["subject"] = "openclaw票据报销测试2"
+    assert cleanup_allowed(message, config(True)) is False
+
+
+def test_travel_cleanup_requires_durable_ingestion(tmp_path: Any) -> None:
+    import sqlite3
+
+    message = mail("rail")
+    message["headers"].update(subject="网上购票系统-电子发票通知", **{"from": "12306@rails.com.cn"})
+    cfg = config(True)
+    assert cleanup_allowed(message, cfg) is False
+    database_path = tmp_path / "expense.sqlite"
+    with sqlite3.connect(database_path) as database:
+        database.execute("CREATE TABLE messages(id TEXT PRIMARY KEY, disposition TEXT NOT NULL)")
+        database.execute("INSERT INTO messages VALUES('rail','travel_candidate')")
+    cfg["expenseStateDb"] = str(database_path)
+    assert cleanup_allowed(message, cfg) is True
 
 
 def test_same_workday_is_not_cleaned_twice_on_weekend() -> None:

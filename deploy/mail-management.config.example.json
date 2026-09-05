@@ -14,5 +14,6 @@
   "holidays": [],
   "extraWorkdays": [],
   "cleanup": {"enabled": false, "approved": false, "scope": "inbox", "maxDelete": 100},
-  "stateFile": "/home/USER/.local/state/openclaw-mail-management/state.json"
+  "stateFile": "/home/USER/.local/state/openclaw-mail-management/state.json",
+  "expenseStateDb": "/home/USER/.local/state/openclaw-expense-receipts/expense.sqlite"
 }
