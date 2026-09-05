@@ -8,6 +8,7 @@ import json
 import os
 import sqlite3
 import subprocess
+import time
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -257,12 +258,26 @@ def main() -> None:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--collect-only", action="store_true")
     mode.add_argument("--reconcile-only", action="store_true")
+    parser.add_argument("--initialize-cursor-now", action="store_true")
     args = parser.parse_args()
     config = json.loads(Path(args.config).expanduser().read_text())
     lock_path = Path(config["stateDir"]).expanduser() / "worker.lock"
     lock_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     with lock_path.open("a") as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if args.initialize_cursor_now:
+            database = connect(Path(config["stateDir"]).expanduser() / "expense.sqlite")
+            with database:
+                database.execute(
+                    "INSERT INTO metadata(key,value) VALUES('gmail_cursor_ms',?) "
+                    "ON CONFLICT(key) DO NOTHING", (str(time.time_ns() // 1_000_000),),
+                )
+            value = database.execute(
+                "SELECT value FROM metadata WHERE key='gmail_cursor_ms'"
+            ).fetchone()[0]
+            database.close()
+            print(json.dumps({"status": "initialized", "gmailCursorMs": value}))
+            return
         print(json.dumps(run(
             config, preview=args.preview, test_ids=args.test_message,
             collect=not args.reconcile_only, reconcile=not args.collect_only,

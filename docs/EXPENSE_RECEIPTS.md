@@ -72,3 +72,5 @@ Synchronization must check the CLI exit status and retain an actionable failure
 record. Production enablement requires sanitized fixtures for every observed format,
 unit/causal tests, an isolated filesystem integration test, dry-run Gmail discovery,
 and one read-back-verified Nextcloud test directory before live scheduling.
+On a fresh production ledger, run `openclaw-expense-receipts --initialize-cursor-now`
+once before enabling collection so historical mail is not silently imported.
