@@ -1,6 +1,7 @@
 """Version-pinned CloudKit date alarms for pyicloud Reminders 2.6.x."""
 from __future__ import annotations
 
+import base64
 import json
 import time
 import uuid
@@ -75,7 +76,7 @@ def add_date_alarm(service: Any, reminder: Any, trigger_at: datetime, timezone: 
             fields={
                 "DateComponentsData": {
                     "type": "BYTES",
-                    "value": json.dumps(components, separators=(",", ":")).encode(),
+                    "value": _encoded_date_components(components),
                 },
                 "Type": {"type": "STRING", "value": "Date"},
                 "Alarm": {"type": "REFERENCE", "value": {
@@ -114,3 +115,8 @@ def _date_components(trigger_at: datetime, timezone: str) -> dict[str, Any]:
         "hour": local.hour, "second": local.second, "day": local.day,
         "month": local.month, "era": 1, "year": local.year,
     }
+
+
+def _encoded_date_components(components: dict[str, Any]) -> str:
+    raw = json.dumps(components, separators=(",", ":")).encode()
+    return base64.b64encode(raw).decode("ascii")
